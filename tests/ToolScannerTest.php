@@ -239,7 +239,7 @@ class ToolScannerTest extends TestCase
         $service = new TestToolService();
         $this->scanner->scan($service);
 
-        $tools = $this->registry->getTools();
+        $tools = $this->registry->getToolSummaries();
         $searchTool = array_values(array_filter($tools, fn ($t) => $t['name'] === 'search_items'))[0];
 
         $this->assertEquals('string', $searchTool['inputSchema']['properties']['query']['type']);
@@ -250,7 +250,7 @@ class ToolScannerTest extends TestCase
         $service = new TestToolService();
         $this->scanner->scan($service);
 
-        $tools = $this->registry->getTools();
+        $tools = $this->registry->getToolSummaries();
         $listTool = array_values(array_filter($tools, fn ($t) => $t['name'] === 'list_items'))[0];
 
         $this->assertEquals('integer', $listTool['inputSchema']['properties']['page']['type']);
@@ -262,7 +262,7 @@ class ToolScannerTest extends TestCase
         $service = new TestToolService();
         $this->scanner->scan($service);
 
-        $tools = $this->registry->getTools();
+        $tools = $this->registry->getToolSummaries();
         $listTool = array_values(array_filter($tools, fn ($t) => $t['name'] === 'list_items'))[0];
 
         $this->assertEquals(1, $listTool['inputSchema']['properties']['page']['default']);
@@ -274,7 +274,7 @@ class ToolScannerTest extends TestCase
         $service = new TestToolService();
         $this->scanner->scan($service);
 
-        $tools = $this->registry->getTools();
+        $tools = $this->registry->getToolSummaries();
         $searchTool = array_values(array_filter($tools, fn ($t) => $t['name'] === 'search_items'))[0];
 
         $this->assertEquals(['asc', 'desc'], $searchTool['inputSchema']['properties']['sort']['enum']);
@@ -285,7 +285,7 @@ class ToolScannerTest extends TestCase
         $service = new TestToolService();
         $this->scanner->scan($service);
 
-        $tools = $this->registry->getTools();
+        $tools = $this->registry->getToolSummaries();
         $searchTool = array_values(array_filter($tools, fn ($t) => $t['name'] === 'search_items'))[0];
 
         $this->assertEquals(1, $searchTool['inputSchema']['properties']['limit']['minimum']);
@@ -297,7 +297,7 @@ class ToolScannerTest extends TestCase
         $service = new TestToolService();
         $this->scanner->scan($service);
 
-        $tools = $this->registry->getTools();
+        $tools = $this->registry->getToolSummaries();
         $searchTool = array_values(array_filter($tools, fn ($t) => $t['name'] === 'search_items'))[0];
 
         $this->assertEquals('Search query', $searchTool['inputSchema']['properties']['query']['description']);
@@ -344,7 +344,7 @@ class ToolScannerTest extends TestCase
 
         $this->assertEquals(4, $count1);
         $this->assertEquals(1, $count2);
-        $this->assertCount(5, $this->registry->getTools());
+        $this->assertCount(5, $this->registry->getToolSummaries());
     }
 
     // ========== Additional Tests for Coverage ==========
@@ -354,7 +354,7 @@ class ToolScannerTest extends TestCase
         $service = new TypeTestService();
         $this->scanner->scan($service);
 
-        $tools = $this->registry->getTools();
+        $tools = $this->registry->getToolSummaries();
         $nullableTool = array_values(array_filter($tools, fn ($t) => $t['name'] === 'nullable_param'))[0];
 
         $this->assertEquals('string', $nullableTool['inputSchema']['properties']['value']['type']);
@@ -366,7 +366,7 @@ class ToolScannerTest extends TestCase
         $service = new TypeTestService();
         $this->scanner->scan($service);
 
-        $tools = $this->registry->getTools();
+        $tools = $this->registry->getToolSummaries();
         $floatTool = array_values(array_filter($tools, fn ($t) => $t['name'] === 'float_param'))[0];
 
         $this->assertEquals('number', $floatTool['inputSchema']['properties']['amount']['type']);
@@ -377,7 +377,7 @@ class ToolScannerTest extends TestCase
         $service = new TypeTestService();
         $this->scanner->scan($service);
 
-        $tools = $this->registry->getTools();
+        $tools = $this->registry->getToolSummaries();
         $boolTool = array_values(array_filter($tools, fn ($t) => $t['name'] === 'bool_param'))[0];
 
         $this->assertEquals('boolean', $boolTool['inputSchema']['properties']['flag']['type']);
@@ -388,7 +388,7 @@ class ToolScannerTest extends TestCase
         $service = new TypeTestService();
         $this->scanner->scan($service);
 
-        $tools = $this->registry->getTools();
+        $tools = $this->registry->getToolSummaries();
         $arrayTool = array_values(array_filter($tools, fn ($t) => $t['name'] === 'array_param'))[0];
 
         $this->assertEquals('array', $arrayTool['inputSchema']['properties']['items']['type']);
@@ -399,7 +399,7 @@ class ToolScannerTest extends TestCase
         $service = new TypeTestService();
         $this->scanner->scan($service);
 
-        $tools = $this->registry->getTools();
+        $tools = $this->registry->getToolSummaries();
         $mixedTool = array_values(array_filter($tools, fn ($t) => $t['name'] === 'mixed_param'))[0];
 
         // Untyped params default to string
@@ -435,7 +435,7 @@ class ToolScannerTest extends TestCase
         $service = new TypeTestService();
         $this->scanner->scan($service);
 
-        $tools = $this->registry->getTools();
+        $tools = $this->registry->getToolSummaries();
         $requiredTool = array_values(array_filter($tools, fn ($t) => $t['name'] === 'required_no_default'))[0];
 
         // Should have 'required' in the schema

@@ -108,7 +108,7 @@ class ToolVersionOutputSchemaTest extends TestCase
     {
         $this->scanner->scan(new VersionedToolService());
 
-        $tools = $this->registry->getTools();
+        $tools = $this->registry->getToolSummaries();
         $hero = array_values(array_filter($tools, fn ($t) => $t['name'] === 'hero_generate'))[0];
 
         $this->assertArrayHasKey('outputSchema', $hero);
@@ -122,7 +122,7 @@ class ToolVersionOutputSchemaTest extends TestCase
     {
         $this->scanner->scan(new VersionedToolService());
 
-        $tools = $this->registry->getTools();
+        $tools = $this->registry->getToolSummaries();
         $plain = array_values(array_filter($tools, fn ($t) => $t['name'] === 'plain_tool'))[0];
 
         $this->assertArrayNotHasKey('outputSchema', $plain);

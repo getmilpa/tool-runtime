@@ -71,13 +71,13 @@ class ToolRegistryTest extends TestCase
         $this->assertFalse($this->registry->has('nonexistent_tool'));
     }
 
-    public function testGetToolsReturnsAllRegisteredTools(): void
+    public function testGetToolSummariesReturnsAllRegisteredTools(): void
     {
         $this->registry->register('tool1', 'Tool 1', [], fn () => null);
         $this->registry->register('tool2', 'Tool 2', [], fn () => null);
         $this->registry->register('tool3', 'Tool 3', [], fn () => null);
 
-        $tools = $this->registry->getTools();
+        $tools = $this->registry->getToolSummaries();
 
         $this->assertCount(3, $tools);
         $names = array_column($tools, 'name');
@@ -86,7 +86,7 @@ class ToolRegistryTest extends TestCase
         $this->assertContains('tool3', $names);
     }
 
-    public function testGetToolsReturnsCorrectStructure(): void
+    public function testGetToolSummariesReturnsCorrectStructure(): void
     {
         $schema = [
             'type' => 'object',
@@ -95,11 +95,29 @@ class ToolRegistryTest extends TestCase
 
         $this->registry->register('my_tool', 'My description', $schema, fn () => null);
 
-        $tools = $this->registry->getTools();
+        $tools = $this->registry->getToolSummaries();
 
         $this->assertEquals('my_tool', $tools[0]['name']);
         $this->assertEquals('My description', $tools[0]['description']);
         $this->assertEquals($schema, $tools[0]['inputSchema']);
+    }
+
+    public function testGetToolDefinitionsReturnsToolDefinitionObjects(): void
+    {
+        $this->registry->register('tool1', 'Tool 1', [], fn () => null);
+        $this->registry->register('tool2', 'Tool 2', [], fn () => null);
+
+        $definitions = $this->registry->getToolDefinitions();
+
+        $this->assertCount(2, $definitions);
+        $this->assertContainsOnlyInstancesOf(\Milpa\ToolRuntime\ToolDefinition::class, $definitions);
+        $this->assertEquals('tool1', $definitions[0]->name);
+        $this->assertEquals('tool2', $definitions[1]->name);
+    }
+
+    public function testGetToolDefinitionsIsEmptyForFreshRegistry(): void
+    {
+        $this->assertSame([], $this->registry->getToolDefinitions());
     }
 
     public function testCallNonexistentToolReturnsError(): void

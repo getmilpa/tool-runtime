@@ -39,7 +39,20 @@ final class HumanVerifyTool
      * Register the `human_verify` tool callback on the given registry.
      *
      * Wires {@see handle()} as the single callback behind the MCP `tools/call` surface, marking
-     * the tool as mutating and confirmation-required so callers go through the request/resolve flow.
+     * the tool as mutating. `requiresConfirmation` is deliberately `false` (tool-runtime 0.2):
+     * `handle()` already owns its own two-phase `request_id` protocol — open a request, resolve
+     * it later — so stacking the registry's generic confirm-token gate on top produced a
+     * confusing 3-4 call choreography (registry gate -> redeem -> handle()'s own request phase
+     * -> resolve, itself gated again) with no `request_id` visible until the SECOND call. With
+     * the gate bypassed, `handle()` runs directly on every call: one call opens a request and
+     * returns its `request_id` immediately, a second call with `decision` + that `request_id`
+     * resolves it — the two-phase flow the tool was built around, reached directly through the
+     * registry, not just by calling {@see handle()} out of band.
+     *
+     * Note: a channel whose policy sets `require_confirmation_for_mutating` (e.g. the built-in
+     * `telegram` policy) still gates ANY `mutating: true` tool regardless of this flag — see
+     * {@see \Milpa\ToolRuntime\PolicyGate::requiresConfirmation()}. The bypass is only total on
+     * channels without that policy (e.g. `cli`, `mcp`, `web` by default).
      */
     public function register(ToolRegistryInterface $registry): void
     {
@@ -50,7 +63,7 @@ final class HumanVerifyTool
             self::inputSchema(),
             /** @param array<string, mixed> $args */
             fn (array $args): ToolResult => $this->handle($args),
-            new ToolOptions(mutating: true, requiresConfirmation: true),
+            new ToolOptions(mutating: true, requiresConfirmation: false),
         );
     }
 

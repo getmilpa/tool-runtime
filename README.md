@@ -83,6 +83,17 @@ calling — a human over `cli`, an LLM over `mcp`, or a bot over `telegram`:
    channel's `require_confirmation_for_mutating` policy) returns a `confirm_token` on the
    first call instead of executing; the caller replays the same arguments plus that token to
    proceed. `ConfirmationTokenStore` holds the pending action and its expiry.
+
+   **The redemption contract, precisely:** on the first call, `ConfirmationTokenStore::create()`
+   snapshots the *exact args of that call* (name + args + a 60s-default expiry) and hands back a
+   random token. The caller is expected to replay the same arguments plus `confirm_token` on the
+   second call — but the runtime does not diff or validate that replay: `ToolRegistry::call()`
+   strips `confirm_token` off the incoming args, calls `ConfirmationTokenStore::consume($token,
+   $name)`, and — if the token is valid, unexpired, and minted for this tool name — **discards
+   whatever args the second call actually sent** and executes with the args stored at `create()`
+   time instead. A token is one-time-use (deleted on consume) and matched only by `$name`, not by
+   argument identity. Practically: the second call's args (other than `confirm_token` itself) are
+   inert — the tool executes with the *first* call's arguments, not the second's.
 5. **Execute** — the tool's callback runs with a soft timeout; a bare return value is
    wrapped in `ToolResult::success()` automatically, and an uncaught `Throwable` becomes
    `ToolResult::error()` (`ToolResult::INTERNAL_ERROR`) instead of propagating.
@@ -107,17 +118,25 @@ This package ships the reference implementation:
   `verification.granted` / `verification.rejected`.
 - **`HumanVerifyTool`** exposes `HumanVerifier` as the `human_verify` tool — the *same*
   registry pipeline every other tool runs through, no special-cased transport. Its
-  `register()` marks it `ToolOptions(mutating: true, requiresConfirmation: true)`, so
-  **any** call through `ToolRegistry::call()` — whether it's a request or a resolve — hits
-  the registry's own step-4 confirmation gate (see [The pipeline](#the-pipeline)) *before*
-  `HumanVerifyTool::handle()` ever runs.
+  `register()` marks it `ToolOptions(mutating: true, requiresConfirmation: false)` — as of
+  tool-runtime 0.2, the registry's generic step-4 confirmation gate (see
+  [The pipeline](#the-pipeline)) is deliberately **bypassed** for `human_verify`, because
+  `handle()` already owns its own two-phase `request_id` protocol (open a request, resolve it
+  later). Stacking the registry's confirm-token gate on top of that used to produce a
+  confusing 3-4 call choreography — see [Cambios en 0.2](#changed-in-02-the-double-gate-bypass)
+  below.
 
-### Through the registry: the generic confirm-token dance
+  ⚠️ The bypass is not absolute: a channel whose policy sets
+  `require_confirmation_for_mutating` (the built-in `telegram` policy does) still gates
+  **any** `mutating: true` tool via `PolicyGate::requiresConfirmation()`, regardless of the
+  tool's own `requiresConfirmation` flag. On `cli`, `mcp`, and `web` (none of which set that
+  policy by default) the bypass is total.
 
-Calling `human_verify` via `$registry->call()` behaves exactly like any other
-`requiresConfirmation` tool: the first call does **not** run `handle()`. It mints a
-`confirm_token` and returns the registry's generic wrapper instead — no `request_id`
-anywhere, because this wrapper is generic and knows nothing about `HumanVerifier`:
+### Through the registry: request → resolve in two calls
+
+Since 0.2, calling `human_verify` via `$registry->call()` runs `handle()` directly — no
+generic confirm-token wrapper in between. A full request → resolve round trip is exactly the
+two calls `HumanVerifyTool` was designed around:
 
 ```php
 use Milpa\ToolRuntime\Verification\HumanVerifier;
@@ -125,54 +144,40 @@ use Milpa\ToolRuntime\Verification\HumanVerifyTool;
 
 (new HumanVerifyTool(new HumanVerifier()))->register($registry);
 
-$registry->call('human_verify', [
+$request = $registry->call('human_verify', [
     'subject' => 'gate:report.publish',
-    'decision' => 'grant',
-    'principal' => 'agent:claude',
-    'request_id' => 'req-123',
 ], $ctx);
 // -> ToolResult success, data: [
-//      'requires_confirmation' => true,
-//      'confirm_token' => '7e01bf71...',
-//      'action_summary' => 'human_verify(subject=gate:report.publish, decision=grant, principal=agent:claude)',
-//      'expires_at' => '2026-07-07T02:16:26+00:00',
+//      'subject' => 'gate:report.publish', 'policy' => 'single',
+//      'request_id' => '06a1dda5-...',
 //    ]
-// handle() has NOT run — HumanVerifier::grant() has not been called yet.
+// handle() ran on THIS call — HumanVerifier::verify() ran and dispatched
+// `verification.requested`. No confirm_token anywhere: the registry gate never ran.
 
 $registry->call('human_verify', [
     'subject' => 'gate:report.publish',
     'decision' => 'grant',
     'principal' => 'agent:claude',
-    'request_id' => 'req-123',
-    'confirm_token' => '7e01bf71...',   // from the previous response
+    'request_id' => $request->data['request_id'],
 ], $ctx);
 // -> ToolResult success, data: [
 //      'status' => 'passed', 'reason' => null, 'verifier' => 'human_verify',
 //      'principal' => 'agent:claude', 'missing' => [], 'metadata' => [],
 //    ]
-// NOW handle() ran, using the exact args ConfirmationTokenStore stored at create() time
-// (not whatever you pass on the second call) — this is what actually invoked HumanVerifier::grant().
+// HumanVerifier::grant() ran and dispatched `verification.granted`.
 ```
 
-The second call must replay the same arguments as the first, plus `confirm_token`;
-`ConfirmationTokenStore::consume()` hands `ToolRegistry::call()` back the args it stored,
-and those — not the ones on the redeeming call — are what `handle()` receives.
-
-⚠️ Calling `human_verify` through the registry **without** a `decision` (to open a request)
-hits the same gate: the first call only returns a `confirm_token`, and redeeming it invokes
-`handle()` with no `decision`, which — being `HumanVerifyTool`'s own request phase — returns
-*another* confirmation, this one carrying `request_id`. Resolving that request then needs a
-**second** confirm-token round trip (this time with `decision` in the args) — four registry
-calls end-to-end. For the two-phase `request_id` flow `HumanVerifyTool` was built around,
-skip the registry and call the tool directly — see below.
+Echo the `request_id` from the first call's response back on the resolving call — it is
+`handle()`'s own correlation id (#7), not the registry's `confirm_token`; `human_verify` never
+mints or expects a `confirm_token`.
 
 ### Direct usage: the two-phase `request_id` flow
 
-`HumanVerifyTool`'s request → resolve round trip (open a request, get a `request_id`,
-resolve it later with that id) is reached by calling `handle()` directly — this is how the
-package's own tests exercise it (`tests/Unit/Verification/HumanVerifyToolTest.php`), and
-it's the sanctioned way to drive D8 verification programmatically, independent of the
-registry's confirmation gate:
+The same request → resolve round trip is also reachable by calling `handle()` directly,
+independent of any `ToolRegistry` — useful when you don't have a registry at hand (e.g. a
+unit test), and exactly how the package's own tests exercise it
+(`tests/Verification/HumanVerifyToolRegistryGateTest.php` exercises it through the registry;
+call `handle()` directly for the registry-free version of the same flow):
 
 ```php
 use Milpa\ToolRuntime\Verification\HumanVerifier;
@@ -197,6 +202,54 @@ $tool->handle([
 Any other `VerifierInterface` implementation — a deterministic rule, a quorum vote, an
 external approval service — plugs into the same seam.
 
+### Changed in 0.2: the double-gate bypass
+
+Before 0.2, `HumanVerifyTool::register()` used `requiresConfirmation: true`, so **any** call
+through `ToolRegistry::call()` — request or resolve alike — hit the registry's own step-4
+confirmation gate *before* `handle()` ever ran. Opening a request took **two** registry calls
+just to reach `handle()`'s own request phase (which itself returned a confirmation, this one
+carrying `request_id`) — and resolving it needed a **third**, itself gated the same way. The
+registry's generic wrapper carries no `request_id` (it knows nothing about `HumanVerifier`),
+so a caller only ever saw the correlation id after redeeming a token they didn't know they'd
+need. 0.2 sets `requiresConfirmation: false` instead, since `handle()`'s own `request_id`
+round trip already *is* the confirmation protocol — the registry's generic one was pure
+overhead for this tool specifically. `tests/Verification/HumanVerifyToolRegistryGateTest.php`
+pins both the old (double-gated) and new (direct) behavior for reference.
+
+### Events: what the payload actually carries
+
+`HumanVerifier` dispatches three events — `verification.requested` (from `verify()`),
+`verification.granted` and `verification.rejected` (from `grant()` / `reject()`) — through
+the optional `MilpaEventDispatcherInterface` passed to its constructor. Every dispatch uses
+the **same payload shape**: a single key, `'event'`, holding the event **object**, not a
+flattened array of the request's fields:
+
+```php
+$dispatcher->dispatch('verification.requested', ['event' => $requestedEvent]);
+// $requestedEvent instanceof Milpa\Events\VerificationRequestedEvent
+
+$dispatcher->dispatch('verification.granted', ['event' => $grantedEvent]);
+// $grantedEvent instanceof Milpa\Events\VerificationGrantedEvent
+
+$dispatcher->dispatch('verification.rejected', ['event' => $rejectedEvent]);
+// $rejectedEvent instanceof Milpa\Events\VerificationRejectedEvent
+```
+
+A listener reaches the data through the event object's accessors, **not** array keys —
+`$payload['subject']` is always `null`/undefined; the subject lives at
+`$payload['event']->getRequest()->subject`:
+
+| Event | Accessors |
+|-------|-----------|
+| `VerificationRequestedEvent` | `getRequest(): VerificationRequest`, `getRequestId(): ?string` |
+| `VerificationGrantedEvent` | `getRequest(): VerificationRequest`, `getResult(): VerificationResult`, `getRequestId(): ?string` |
+| `VerificationRejectedEvent` | `getRequest(): VerificationRequest`, `getResult(): VerificationResult`, `getRequestId(): ?string` |
+
+A listener that wants to work with any of the three (or with a future verifier's events)
+should branch on the event's class, or narrow via `getRequest()`/`getResult()`, rather than
+assume a flat array — this is defined and enforced by the event classes' own docblocks in
+`milpa/core` (`Milpa\Events\Verification{Requested,Granted,Rejected}Event`).
+
 ## What lives where
 
 | Layer | Package | Owns |
@@ -213,7 +266,7 @@ The types you construct and pass around day to day:
 |------|------------|
 | `Contracts\ToolContext` | Who/where/what-scopes for one call — `principal`, `channel`, `scopes`, `mode`. Named constructors per channel: `cli()`, `mcp()`, `telegram()`. |
 | `ToolResult` | The uniform return shape — `success`, `data`, `message`, `error`, `meta`. Factories for common shapes: `success()`, `error()`, `paginated()`, `detail()`, `confirmation()`, `blocked()`. |
-| `ToolRegistry` | The pipeline: `register()` to add a tool by hand, `call()` to run resolve→validate→authorize→execute→audit, `getTools()` / `getToolsWithinBudget()` for LLM/MCP exposure. |
+| `ToolRegistry` | The pipeline: `register()` to add a tool by hand, `call()` to run resolve→validate→authorize→execute→audit, `getToolSummaries()` (plain-array LLM/MCP wire shape) / `getToolDefinitions()` (typed `list<ToolDefinition>`) / `getToolsWithinBudget()` for LLM/MCP exposure. |
 | `Rendering\RendererRegistry` | Picks a `ChannelRendererInterface` for a `ToolResult` based on `ToolContext::$channel`, falling back to a default renderer or raw JSON. |
 | `Contracts\LlmServiceInterface` | The seam a plugin implements to provide LLM access (`generateResponse()`) and other plugins consume to get one, without depending on a specific provider. |
 

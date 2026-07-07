@@ -89,11 +89,20 @@ class ToolRegistry implements ToolRegistryInterface
     }
 
     /**
-     * Get all tools for LLM/MCP exposure.
+     * Get all tools as plain-array summaries, for LLM/MCP exposure.
      *
-     * @return array<array{name: string, description: string, inputSchema: array<mixed>, version?: string, outputSchema?: array<mixed>}>
+     * This is the wire shape: a JSON-serializable summary per tool (no callback, no internal
+     * state) — exactly what an MCP `tools/list` response or a token-budget report needs. It is
+     * NOT the internal {@see ToolDefinition} object; use {@see getToolDefinitions()} when you
+     * need the typed VO (e.g. its `->callback` or `->mutating`).
+     *
+     * Renamed from `getTools()` in tool-runtime 0.2 — the old name was easy to confuse with a
+     * `list<ToolDefinition>` getter (which `ToolDefinition` existing internally invited), and a
+     * caller assuming `->name` on these entries got a silent `null` instead of a type error.
+     *
+     * @return list<array{name: string, description: string, inputSchema: array<string, mixed>, version?: string, outputSchema?: array<string, mixed>}>
      */
-    public function getTools(): array
+    public function getToolSummaries(): array
     {
         $list = [];
         foreach ($this->tools as $name => $tool) {
@@ -111,6 +120,21 @@ class ToolRegistry implements ToolRegistryInterface
             $list[] = $entry;
         }
         return $list;
+    }
+
+    /**
+     * Get all registered tools as their typed {@see ToolDefinition} value objects.
+     *
+     * Unlike {@see getToolSummaries()}, this exposes the full internal VO — including
+     * `->callback` and `->mutating` — for consumers that need more than the LLM/MCP wire shape
+     * (e.g. building an alternate registry, introspecting tool metadata). Registration order is
+     * preserved.
+     *
+     * @return list<ToolDefinition>
+     */
+    public function getToolDefinitions(): array
+    {
+        return array_values($this->tools);
     }
 
     /**
@@ -168,7 +192,7 @@ class ToolRegistry implements ToolRegistryInterface
      */
     public function getToolsWithinBudget(string $model, ?array $priorityTools = null): array
     {
-        $allTools = $this->getTools();
+        $allTools = $this->getToolSummaries();
 
         // If priority tools specified, reorder to put them first
         if ($priorityTools !== null) {
@@ -209,7 +233,7 @@ class ToolRegistry implements ToolRegistryInterface
      */
     public function getTokenUsageReport(string $model = 'gpt-4'): string
     {
-        return $this->tokenEstimator->getUsageReport($this->getTools(), $model);
+        return $this->tokenEstimator->getUsageReport($this->getToolSummaries(), $model);
     }
 
     /**
@@ -219,7 +243,7 @@ class ToolRegistry implements ToolRegistryInterface
      */
     public function estimateTokens(): array
     {
-        return $this->tokenEstimator->estimateToolsTokens($this->getTools());
+        return $this->tokenEstimator->estimateToolsTokens($this->getToolSummaries());
     }
 
     /**
@@ -229,7 +253,7 @@ class ToolRegistry implements ToolRegistryInterface
      */
     public function checkTokenBudget(string $model): array
     {
-        return $this->tokenEstimator->checkToolBudget($this->getTools(), $model);
+        return $this->tokenEstimator->checkToolBudget($this->getToolSummaries(), $model);
     }
 
     /**
