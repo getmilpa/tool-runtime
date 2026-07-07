@@ -44,5 +44,28 @@ if ($version === null) {
 }
 
 $count = (new Milpa\Docs\SiteGenerator(dirname(__DIR__) . '/src', $out, $cssBase, $version))->generate();
+
+// INTERIM re-branding: the family generator (milpa/core <= 0.2) hardcodes the
+// "Milpa Core" brand, hero prose and install snippet in Shell/SiteGenerator.
+// Until core parametrizes those, rewrite the generated HTML for this package.
+// Tracked in the monorepo ROADMAP (gen-docs multi-paquete, mejoras diferidas).
+$rebrand = [
+    'Milpa Core' => 'Milpa ToolRuntime',
+    'id="milpa-core"' => 'id="milpa-tool-runtime"',
+    'composer require milpa/core' => 'composer require milpa/tool-runtime',
+    'The framework-agnostic <strong>contracts core</strong> of Milpa — a modular PHP runtime for '
+        . 'applications operable by <strong>both humans and agents</strong>. No ORM, no HTTP client, no kernel: '
+        . 'just the primitives every Milpa module builds on.'
+    => 'The <strong>AI tool-execution runtime</strong> of Milpa — the concrete engine behind the tooling '
+        . 'contracts that <code>milpa/core</code> defines. Methods declare themselves with <code>#[Tool]</code>; '
+        . 'every call runs one pipeline: resolve, validate, authorize, execute, audit.',
+];
+$pages = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($out, FilesystemIterator::SKIP_DOTS));
+foreach ($pages as $file) {
+    if ($file->getExtension() === 'html') {
+        file_put_contents($file->getPathname(), strtr((string) file_get_contents($file->getPathname()), $rebrand));
+    }
+}
+
 echo "generated {$count} page(s) to {$out} (v{$version}, css-base: {$cssBase})\n";
 exit(0);
