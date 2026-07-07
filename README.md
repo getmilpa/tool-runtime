@@ -6,6 +6,7 @@
 [![Packagist](https://img.shields.io/packagist/v/milpa/tool-runtime.svg)](https://packagist.org/packages/milpa/tool-runtime)
 [![PHP](https://img.shields.io/badge/php-%E2%89%A5%208.3-777bb4.svg)](https://www.php.net/)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![Docs](https://img.shields.io/badge/docs-API%20reference-blue.svg)](https://getmilpa.github.io/tool-runtime/)
 
 `milpa/tool-runtime` is where `milpa/core`'s agent-tool-readiness seam becomes a working
 engine. `Milpa\Interfaces\Tooling\ToolProviderInterface` and `ToolRegistryInterface` are
@@ -221,6 +222,11 @@ The types you construct and pass around day to day:
 - PHP **≥ 8.3**
 - [`milpa/core`](https://packagist.org/packages/milpa/core) **^0.2**
 - [`psr/log`](https://packagist.org/packages/psr/log) **^3**
+
+## Documentation
+
+**Full API reference: [getmilpa.github.io/tool-runtime](https://getmilpa.github.io/tool-runtime/)** — generated
+straight from the source DocBlocks and dressed with the Milpa design system.
 
 ## Contributing
 
