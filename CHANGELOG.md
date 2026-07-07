@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.2.0](https://github.com/getmilpa/tool-runtime/compare/v0.1.0...v0.2.0) (2026-07-07)
+
+
+### ⚠ BREAKING CHANGES
+
+* direct human_verify (no double gate) + typed tool listings
+
+### Features
+
+* direct human_verify (no double gate) + typed tool listings ([6442fb3](https://github.com/getmilpa/tool-runtime/commit/6442fb3ed92e8a76b085571a2d375585f10b1ac8))
+
+
+### Bug Fixes
+
+* **docs:** family-coherent links + footer credit color on the docs site ([d0b1031](https://github.com/getmilpa/tool-runtime/commit/d0b10313a6f0af603eccfd239bfa7549440510e0))
+
 ## 0.1.0 (2026-07-07)
 
 
