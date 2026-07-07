@@ -1,0 +1,28 @@
+{
+  "name": "milpa/tool-runtime",
+  "description": "AI tool-execution runtime for the Milpa PHP framework: registry pipeline (resolve, validate, authorize, execute, audit), #[Tool] attributes, schema validation, policy gate, rate limiting, channel rendering, and human verification.",
+  "type": "library",
+  "license": "Apache-2.0",
+  "require": {
+    "php": ">=8.3",
+    "milpa/core": "^0.2",
+    "psr/log": "^3"
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^11.5",
+    "phpstan/phpstan": "^2.1",
+    "phpstan/phpdoc-parser": "^2.3",
+    "friendsofphp/php-cs-fixer": "^3.65"
+  },
+  "autoload": {
+    "psr-4": {
+      "Milpa\\ToolRuntime\\": "src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Milpa\\ToolRuntime\\Tests\\": "tests/",
+      "Milpa\\Docs\\": "vendor/milpa/core/tools/gen-docs/"
+    }
+  }
+}
