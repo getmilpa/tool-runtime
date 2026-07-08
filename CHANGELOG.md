@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/getmilpa/tool-runtime/compare/v0.2.0...v0.2.1) (2026-07-08)
+
+
+### Bug Fixes
+
+* serialize empty properties as a JSON object, not an array ([1873966](https://github.com/getmilpa/tool-runtime/commit/18739668590673a725cd0a18a8e7743cfee0060c))
+
 ## [0.2.0](https://github.com/getmilpa/tool-runtime/compare/v0.1.0...v0.2.0) (2026-07-07)
 
 
