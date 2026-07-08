@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.5.0](https://github.com/getmilpa/tool-runtime/compare/v0.4.0...v0.5.0) (2026-07-08)
+
+
+### ⚠ BREAKING CHANGES
+
+* tool lifecycle events — tool.executing (interceptable) / executed / failed
+
+### Features
+
+* tool lifecycle events — tool.executing (interceptable) / executed / failed ([f6c2878](https://github.com/getmilpa/tool-runtime/commit/f6c2878f5b4badc794ee4deaf4df03789564316c))
+
 ## [0.4.0](https://github.com/getmilpa/tool-runtime/compare/v0.3.0...v0.4.0) (2026-07-08)
 
 
