@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.4.0](https://github.com/getmilpa/tool-runtime/compare/v0.3.0...v0.4.0) (2026-07-08)
+
+
+### ⚠ BREAKING CHANGES
+
+* resolve verifications by request id (core 0.4 seam)
+
+### Features
+
+* resolve verifications by request id (core 0.4 seam) ([368fe8f](https://github.com/getmilpa/tool-runtime/commit/368fe8fa7b81e8e694503ca0387f51e9aa69db69))
+
 ## [0.3.0](https://github.com/getmilpa/tool-runtime/compare/v0.2.1...v0.3.0) (2026-07-08)
 
 
