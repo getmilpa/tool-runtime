@@ -109,17 +109,39 @@ class ToolRegistry implements ToolRegistryInterface
             $entry = [
                 'name' => $name,
                 'description' => $tool->description,
-                'inputSchema' => !empty($tool->inputSchema) ? $tool->inputSchema : ['type' => 'object'],
+                'inputSchema' => !empty($tool->inputSchema)
+                    ? $this->jsonSafeSchema($tool->inputSchema)
+                    : ['type' => 'object'],
             ];
             if ($tool->version !== null) {
                 $entry['version'] = $tool->version;
             }
             if ($tool->outputSchema !== null) {
-                $entry['outputSchema'] = $tool->outputSchema;
+                $entry['outputSchema'] = $this->jsonSafeSchema($tool->outputSchema);
             }
             $list[] = $entry;
         }
         return $list;
+    }
+
+    /**
+     * Make a schema array safe for `json_encode()` on the wire.
+     *
+     * JSON Schema requires `properties` to be an object, but a tool with zero parameters
+     * stores it as an empty PHP array — which `json_encode()` emits as `[]`, and a strict
+     * MCP host rejects. The internal representation stays an array (the validator iterates
+     * it); only this transport-facing copy swaps an empty `properties` for an object.
+     *
+     * @param array<string, mixed> $schema
+     *
+     * @return array<string, mixed>
+     */
+    private function jsonSafeSchema(array $schema): array
+    {
+        if (isset($schema['properties']) && $schema['properties'] === []) {
+            $schema['properties'] = new \stdClass();
+        }
+        return $schema;
     }
 
     /**
