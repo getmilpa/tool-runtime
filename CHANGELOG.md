@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.3.0](https://github.com/getmilpa/tool-runtime/compare/v0.2.1...v0.3.0) (2026-07-08)
+
+
+### ⚠ BREAKING CHANGES
+
+* split verification into request/resolve tools, stdio context, self-explaining denials
+
+### Features
+
+* split verification into request/resolve tools, stdio context, self-explaining denials ([2107455](https://github.com/getmilpa/tool-runtime/commit/21074552674cceae190bb718a6a351f7572465b6))
+
 ## [0.2.1](https://github.com/getmilpa/tool-runtime/compare/v0.2.0...v0.2.1) (2026-07-08)
 
 
