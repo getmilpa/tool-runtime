@@ -24,16 +24,20 @@ use Milpa\ValueObjects\Verification\VerificationRequest;
 use Milpa\ValueObjects\Verification\VerificationResult;
 
 /**
- * The `human_verify` verifier (D8 / T089): the reference implementation of the core
+ * The human/agent-out-of-band verifier (D8 / T089): the reference implementation of the core
  * {@see VerifierInterface} whose verdict is supplied by a human or agent out-of-band.
  *
- * `verify()` cannot decide synchronously, so it returns a PENDING result and announces
- * `verification.requested`; the verdict arrives later via {@see grant()} / {@see reject()},
- * which emit `verification.granted` / `verification.rejected`. No Doctrine, opaque principals.
+ * Exposed as the `request_verification` / `resolve_verification` tools by
+ * {@see VerificationTool} (split from a single combined tool in tool-runtime 0.3 — see that
+ * class's docblock for why). `verify()` cannot decide synchronously, so it returns a
+ * PENDING result and announces `verification.requested`; the verdict arrives later via
+ * {@see grant()} / {@see reject()}, which emit `verification.granted` /
+ * `verification.rejected`. No Doctrine, opaque principals.
  */
 final class HumanVerifier implements VerifierInterface
 {
-    public const NAME = 'human_verify';
+    /** Identifies this verifier implementation in {@see \Milpa\ValueObjects\Verification\VerificationResult::$verifier}. */
+    public const NAME = 'human_verifier';
 
     public function __construct(private readonly ?MilpaEventDispatcherInterface $dispatcher = null)
     {

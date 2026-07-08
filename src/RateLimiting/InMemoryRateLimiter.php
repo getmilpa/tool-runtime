@@ -60,7 +60,7 @@ class InMemoryRateLimiter implements RateLimiterInterface
         if ($currentUsage + $cost > $maxTokens) {
             $retryAfter = $windowSeconds - ($now - $bucket['window_start']);
             return RateLimitResult::denied(
-                "Rate limit exceeded. Max {$maxTokens} tokens per {$windowSeconds}s",
+                "Rate limit exceeded for '{$key}': max {$maxTokens} tokens per {$windowSeconds}s.",
                 max(0, $retryAfter)
             );
         }

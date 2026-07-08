@@ -86,7 +86,7 @@ class PolicyGate
         // 1. Check require_auth first - if channel requires auth, principal must be set
         if (($policy['require_auth'] ?? false) && empty($ctx->principal)) {
             return AuthorizationResult::denied(
-                "Authentication required for channel: {$ctx->channel}"
+                "channel '{$ctx->channel}' requires an authenticated principal (require_auth) — none provided."
             );
         }
 
@@ -94,7 +94,8 @@ class PolicyGate
         if (!empty($tool->scopes)) {
             if (!$ctx->hasAnyScope($tool->scopes)) {
                 return AuthorizationResult::denied(
-                    "Missing required scope. Need one of: " . implode(', ', $tool->scopes)
+                    "Missing required scope for tool '{$tool->name}'. Need one of: " . implode(', ', $tool->scopes)
+                        . ' — context has: ' . (empty($ctx->scopes) ? '(none)' : implode(', ', $ctx->scopes)) . '.'
                 );
             }
         }
@@ -143,7 +144,9 @@ class PolicyGate
         if ($requiredScopes !== null && !empty($requiredScopes)) {
             if (!$ctx->hasAnyScope($requiredScopes)) {
                 return AuthorizationResult::denied(
-                    "Rule requires scope: " . implode(', ', $requiredScopes)
+                    "Policy rule #{$rule->getId()} for tool '{$tool->name}' requires one of these scopes: "
+                        . implode(', ', $requiredScopes)
+                        . ' — context has: ' . (empty($ctx->scopes) ? '(none)' : implode(', ', $ctx->scopes)) . '.'
                 );
             }
         }
@@ -153,7 +156,10 @@ class PolicyGate
         }
 
         return AuthorizationResult::denied(
-            $rule->getDescription() ?? "Denied by policy rule #{$rule->getId()}"
+            $rule->getDescription() ?? (
+                "Denied by policy rule #{$rule->getId()} for tool '{$tool->name}' on channel '{$ctx->channel}' "
+                . '(principal: ' . ($ctx->principal ?? '(none)') . ').'
+            )
         );
     }
 
@@ -178,7 +184,9 @@ class PolicyGate
 
         // Check if mutating operations are blocked
         if (($policy['block_mutating'] ?? false) && $tool->mutating) {
-            return AuthorizationResult::denied("Mutating operations blocked on channel: {$channel}");
+            return AuthorizationResult::denied(
+                "Mutating tool '{$tool->name}' is blocked on channel '{$channel}' (block_mutating policy)."
+            );
         }
 
         return AuthorizationResult::allowed();

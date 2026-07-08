@@ -141,6 +141,43 @@ class ToolContext
     }
 
     /**
+     * Create context for a trusted local MCP stdio server process.
+     *
+     * ⚠️ **PROCESS-LEVEL TRUST.** This hard-codes `principal: 'stdio'` and the wildcard
+     * `['*']` scope by default — exactly the same "no real auth, but the channel police
+     * accepts a hard-coded identity" shape {@see cli()} already uses for CLI scripts. It is
+     * only appropriate for a transport where the OS process boundary IS the authentication
+     * boundary: a local stdio MCP server that trusts whatever spawned it (e.g. an editor or
+     * agent runtime launching the binary as a child process), with no separate per-caller
+     * identity to authenticate over the wire. Do NOT use this for any MCP transport exposed
+     * over a network (HTTP+SSE, WebSocket, a shared multi-tenant socket, ...) where distinct
+     * callers are NOT process-trusted — build a {@see mcp()} context per authenticated caller
+     * instead.
+     *
+     * Exists because the `mcp` channel's built-in policy sets `require_auth: true` (see
+     * {@see \Milpa\ToolRuntime\PolicyGate}), so a bare `new ToolContext(channel: 'mcp')` (no
+     * `principal`) denies every call with "channel 'mcp' requires an authenticated principal" —
+     * the exact trap a no-auth stdio server falls into with no documented way out. `stdio()`
+     * is that documented way out, in one call instead of hand-rolling the same `principal:
+     * 'stdio', scopes: ['*']` workaround.
+     *
+     * @param string        $requestId The MCP request ID
+     * @param string        $principal Opaque principal recorded for audit/logging — defaults
+     *                                 to `'stdio'` since there is no real caller to authenticate
+     * @param array<string> $scopes    Scopes granted to this context — defaults to `['*']`
+     *                                 (full access), matching the process-level trust model
+     */
+    public static function stdio(string $requestId, string $principal = 'stdio', array $scopes = ['*']): self
+    {
+        return new self(
+            principal: $principal,
+            channel: 'mcp',
+            scopes: $scopes,
+            request_id: $requestId,
+        );
+    }
+
+    /**
      * Create context for MCP server.
      *
      * @param string        $requestId The MCP request ID

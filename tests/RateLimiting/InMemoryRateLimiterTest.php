@@ -51,6 +51,25 @@ class InMemoryRateLimiterTest extends TestCase
         $this->assertGreaterThan(0, $result->retryAfterSeconds);
     }
 
+    /**
+     * Item 3 (0.3 design): a rate-limit denial's reason must state WHICH key (i.e. which
+     * channel:principal:tool composite, as {@see \Milpa\ToolRuntime\ToolRegistry::call()}
+     * builds it) hit the budget, not just the budget figures alone — otherwise a caller
+     * juggling several rate-limited calls has no way to tell which one was throttled from the
+     * message text alone.
+     */
+    public function testConsumeDeniedReasonNamesTheKeyAndTheBudget(): void
+    {
+        $this->limiter->consume('mcp:agent:reviewer:resolve_verification', 100, 60, 100);
+
+        $result = $this->limiter->consume('mcp:agent:reviewer:resolve_verification', 1, 60, 100);
+
+        $this->assertFalse($result->allowed);
+        $this->assertStringContainsString('mcp:agent:reviewer:resolve_verification', $result->reason);
+        $this->assertStringContainsString('100', $result->reason);
+        $this->assertStringContainsString('60', $result->reason);
+    }
+
     public function testConsumeCostAffectsTokens(): void
     {
         // Consume 50 tokens at once
