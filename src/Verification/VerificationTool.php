@@ -135,11 +135,15 @@ final class VerificationTool
     /**
      * Handle a `resolve_verification` call: resolve a pending verification by `request_id`.
      *
-     * `subject` is optional here — when omitted, it falls back to `request_id` itself (still
-     * a non-empty, opaque correlation string) so {@see VerificationRequest}'s non-empty-subject
-     * invariant holds even when the caller does not echo the original subject back. Callers
-     * that want the true subject reachable from the dispatched `verification.granted` /
-     * `verification.rejected` events should echo it explicitly.
+     * `subject` is optional here. When the caller echoes it back, the reconstructed
+     * {@see VerificationRequest} carries the true subject. When omitted, this builds the
+     * request via {@see VerificationRequest::forResolution()} — `subject = null`, identified
+     * purely by `id` — instead of fabricating a value from `request_id` (tool-runtime 0.3's
+     * behavior, dropped in favor of core 0.4's resolution seam: a listener on
+     * `verification.granted`/`verification.rejected` no longer sees a fake, opaque `subject`
+     * that silently diverges from the one carried on `verification.requested` for the same
+     * correlation id). The success MESSAGE below still falls back to `request_id` for
+     * readability — that is tool-runtime-owned formatting, not the VO's `subject`.
      *
      * @param array<string, mixed> $args
      */
@@ -162,18 +166,22 @@ final class VerificationTool
 
         $subject = isset($args['subject']) && trim((string) $args['subject']) !== ''
             ? trim((string) $args['subject'])
-            : $requestId;
+            : null;
         $reason = isset($args['reason']) ? (string) $args['reason'] : null;
 
-        $request = new VerificationRequest($subject, ApprovalPolicy::SINGLE, id: $requestId);
+        $request = $subject !== null
+            ? new VerificationRequest($subject, id: $requestId)
+            : VerificationRequest::forResolution($requestId);
 
         $result = $decision === 'grant'
             ? $this->verifier->grant($request, $principal, $reason)
             : $this->verifier->reject($request, $principal, $reason ?? 'rejected');
 
+        $subjectForMessage = $subject ?? $requestId;
+
         return ToolResult::success(
             $result->toArray(),
-            $result->isSatisfied() ? "Verification granted for '{$subject}'." : "Verification rejected for '{$subject}'.",
+            $result->isSatisfied() ? "Verification granted for '{$subjectForMessage}'." : "Verification rejected for '{$subjectForMessage}'.",
             ['verification_status' => $result->status->value],
         );
     }

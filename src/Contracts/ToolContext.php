@@ -178,14 +178,35 @@ class ToolContext
     }
 
     /**
-     * Create context for MCP server.
+     * Create context for an authenticated MCP server caller.
+     *
+     * **Not for a no-auth, process-trusted transport.** This is the factory for a real,
+     * per-caller identity on the `mcp` channel — `$principal` should be whatever your host
+     * actually authenticated (a user id, an API-token subject, ...), not a placeholder. If
+     * `$principal` is omitted it defaults to the literal string `'mcp'`, which satisfies
+     * {@see \Milpa\ToolRuntime\PolicyGate}'s `require_auth` check for the `mcp` channel (a
+     * non-empty string) but records every caller under the SAME fake identity — indistinguishable
+     * from each other in audit logs/DB policy rules keyed by principal. Passing an explicit
+     * empty string (`principal: ''`) is worse: `??` only substitutes on `null`, so `''` survives
+     * as-is and trips `PolicyGate::authorize()`'s `empty($ctx->principal)` check into a denied
+     * `AuthorizationResult` for every call on that context — a footgun that surfaces as a
+     * runtime authorization failure, not a construction-time error.
+     *
+     * For a local, no-auth stdio MCP server (the OS process boundary IS the trust boundary —
+     * e.g. an editor or agent runtime launching this as a child process), use {@see stdio()}
+     * instead: same `mcp` channel, but its `principal: 'stdio'` / `scopes: ['*']` defaults name
+     * that trust model explicitly instead of leaning on this factory's `'mcp'` placeholder.
+     *
+     * Separately, omitting `$scopes` still raises an `E_USER_DEPRECATED` notice (unchanged) —
+     * that warning is about scope hygiene, not about the principal trap described above; fixing
+     * one does not fix the other.
      *
      * @param string        $requestId The MCP request ID
-     * @param string|null   $principal The authenticated principal (user/service)
+     * @param string|null   $principal The authenticated principal (user/service) — pass a real,
+     *                                 per-caller identity; do not rely on the `'mcp'` default or
+     *                                 pass an empty string (see above)
      * @param array<string> $scopes    Explicit scopes granted to this context
      * @param string        $mode      Execution mode: 'execute' or 'plan'
-     *
-     * @deprecated Calling without explicit scopes is deprecated and will be removed in v2.0
      */
     public static function mcp(string $requestId, ?string $principal = null, array $scopes = [], string $mode = 'execute'): self
     {
@@ -201,7 +222,8 @@ class ToolContext
         return new self(
             principal: $principal ?? 'mcp',
             channel: 'mcp',
-            scopes: $scopes,  // No more wildcard ['*'] by default
+            scopes: $scopes,  // No wildcard ['*'] by default — an authenticated caller gets
+            // exactly the scopes the host grants it, not full access.
             request_id: $requestId,
             mode: $mode
         );

@@ -155,8 +155,13 @@ This package ships the reference implementation:
     request.
   - `resolve_verification(request_id, decision, principal, subject?, reason?)` resolves a
     pending one. `request_id`, `decision` (`grant`|`reject`), and `principal` are
-    **required**; `subject` and `reason` are optional (`subject` falls back to `request_id`
-    if omitted).
+    **required**; `subject` and `reason` are optional. When `subject` is omitted, the
+    resolved `VerificationRequest` is built via `VerificationRequest::forResolution()`
+    (`subject` stays `null`, identified purely by `request_id`) — the earlier `subject =
+    $request_id` fallback (tool-runtime 0.3) is gone, so a `verification.granted` /
+    `verification.rejected` listener never sees a fabricated subject. The tool's own success
+    *message* still shows `request_id` in place of `subject` for readability; that is
+    display-only formatting, not the `VerificationRequest`'s `subject` field.
 
   Tool-runtime 0.2 shipped this as a single combined tool that mixed both phases behind one
   schema, distinguished only by whether `decision` was present — a shape whose name also

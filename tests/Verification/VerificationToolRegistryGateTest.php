@@ -14,6 +14,7 @@ declare(strict_types=1);
 
 namespace Milpa\ToolRuntime\Tests\Verification;
 
+use Milpa\Interfaces\Event\MilpaEventDispatcherInterface;
 use Milpa\ToolRuntime\Contracts\ToolContext;
 use Milpa\ToolRuntime\ToolRegistry;
 use Milpa\ToolRuntime\ToolResult;
@@ -47,12 +48,45 @@ use Psr\Log\NullLogger;
  */
 final class VerificationToolRegistryGateTest extends TestCase
 {
-    private function registryWithVerificationTool(): ToolRegistry
+    private function registryWithVerificationTool(?MilpaEventDispatcherInterface $dispatcher = null): ToolRegistry
     {
         $registry = new ToolRegistry(new NullLogger());
-        (new VerificationTool(new HumanVerifier()))->register($registry);
+        (new VerificationTool(new HumanVerifier($dispatcher)))->register($registry);
 
         return $registry;
+    }
+
+    /**
+     * Minimal recording double for {@see MilpaEventDispatcherInterface}: captures the last
+     * dispatched event name/payload so a test can inspect the {@see \Milpa\ValueObjects\Verification\VerificationRequest}
+     * a verifier handed to the dispatcher, without pulling in a full event-bus test double.
+     */
+    private function recordingDispatcher(): MilpaEventDispatcherInterface
+    {
+        return new class () implements MilpaEventDispatcherInterface {
+            /** @var array{name: string, payload: array<string, mixed>}|null */
+            public ?array $last = null;
+
+            public function dispatch(string $eventName, array $payload = [], bool $async = false): void
+            {
+                $this->last = ['name' => $eventName, 'payload' => $payload];
+            }
+
+            public function subscribe(string $eventName, callable $handler, int $priority = 0): void
+            {
+            }
+
+            /** @return array<int, callable> */
+            public function getSubscribers(string $eventName): array
+            {
+                return [];
+            }
+
+            public function hasSubscribers(string $eventName): bool
+            {
+                return false;
+            }
+        };
     }
 
     public function testRegistryRunsHandleRequestDirectlyOnTheFirstCall(): void
@@ -143,9 +177,10 @@ final class VerificationToolRegistryGateTest extends TestCase
         $this->assertEquals(ToolResult::VALIDATION_ERROR, $result->meta['code']);
     }
 
-    public function testResolveVerificationFallsBackToRequestIdWhenSubjectOmitted(): void
+    public function testResolveVerificationUsesForResolutionWhenSubjectOmitted(): void
     {
-        $registry = $this->registryWithVerificationTool();
+        $dispatcher = $this->recordingDispatcher();
+        $registry = $this->registryWithVerificationTool($dispatcher);
         $ctx = ToolContext::cli();
 
         $request = $registry->call(VerificationTool::REQUEST_NAME, [
@@ -153,7 +188,11 @@ final class VerificationToolRegistryGateTest extends TestCase
         ], $ctx);
         $requestId = $request->data['request_id'];
 
-        // No `subject` echoed back — resolve_verification's schema makes it optional.
+        // No `subject` echoed back — resolve_verification's schema makes it optional. Dropped
+        // the tool-runtime 0.3 fallback (fabricating `subject = $requestId`) in favor of core
+        // 0.4's VerificationRequest::forResolution() seam: `subject` stays null all the way
+        // through to the dispatched event, instead of a fake, opaque value that would silently
+        // diverge from the subject carried on the original `verification.requested` event.
         $resolved = $registry->call(VerificationTool::RESOLVE_NAME, [
             'decision' => 'reject',
             'principal' => 'agent:reviewer',
@@ -163,6 +202,45 @@ final class VerificationToolRegistryGateTest extends TestCase
 
         $this->assertTrue($resolved->success);
         $this->assertEquals('failed', $resolved->data['status']);
+        // Tool-runtime-owned MESSAGE formatting still falls back to request_id for readability
+        // — that fallback lives in VerificationTool::handleResolve(), not in the VO.
         $this->assertStringContainsString((string) $requestId, $resolved->message ?? '');
+
+        $this->assertNotNull($dispatcher->last);
+        $this->assertSame('verification.rejected', $dispatcher->last['name']);
+        $rejectedRequest = $dispatcher->last['payload']['event']->getRequest();
+        $this->assertNull($rejectedRequest->subject);
+        $this->assertSame($requestId, $rejectedRequest->id);
+    }
+
+    public function testResolveVerificationCarriesTheGivenSubjectWhenProvided(): void
+    {
+        $dispatcher = $this->recordingDispatcher();
+        $registry = $this->registryWithVerificationTool($dispatcher);
+        $ctx = ToolContext::cli();
+
+        $request = $registry->call(VerificationTool::REQUEST_NAME, [
+            'subject' => 'gate:report.publish',
+        ], $ctx);
+        $requestId = $request->data['request_id'];
+
+        // `subject` echoed back explicitly — this path is unchanged by the forResolution()
+        // seam: the reconstructed VerificationRequest carries the real subject, not null.
+        $resolved = $registry->call(VerificationTool::RESOLVE_NAME, [
+            'decision' => 'grant',
+            'principal' => 'agent:reviewer',
+            'request_id' => $requestId,
+            'subject' => 'gate:report.publish',
+        ], $ctx);
+
+        $this->assertTrue($resolved->success);
+        $this->assertEquals('passed', $resolved->data['status']);
+        $this->assertStringContainsString('gate:report.publish', $resolved->message ?? '');
+
+        $this->assertNotNull($dispatcher->last);
+        $this->assertSame('verification.granted', $dispatcher->last['name']);
+        $grantedRequest = $dispatcher->last['payload']['event']->getRequest();
+        $this->assertSame('gate:report.publish', $grantedRequest->subject);
+        $this->assertSame($requestId, $grantedRequest->id);
     }
 }
