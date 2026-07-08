@@ -110,7 +110,13 @@ calling — a human over `cli`, an LLM over `mcp`, or a bot over `telegram`:
    `ToolResult::error()` (`ToolResult::INTERNAL_ERROR`) instead of propagating.
 6. **Audit** — `ToolAuditLogger` records every call (success, failure, or rejection) via
    PSR-3, redacting sensitive argument fields (`password`, `token`, `secret`, …) before they
-   ever reach a log line.
+   ever reach a log line. Since 0.5, the success/failure legs of this are event-driven — see
+   [Events](#events-toolexecuting--toolexecuted--toolfailed) below.
+
+Since 0.5, one more thing happens between step 4 and step 5: if a `MilpaEventDispatcherInterface`
+is wired, `ToolRegistry` dispatches `tool.executing` — a listener may short-circuit the call
+(answer on the tool's behalf, e.g. a cache) or veto it outright, both without step 5 ever running.
+See [Events](#events-toolexecuting--toolexecuted--toolfailed).
 
 A `ToolContext` built with `mode: 'plan'` (or `ToolContext::asPlan()`) short-circuits after
 step 3: it validates and authorizes but never executes, returning the would-be plan instead
@@ -135,6 +141,86 @@ boundary" shape `ToolContext::cli()` already uses for CLI scripts. This exists b
 `mcp` channel's built-in policy sets `require_auth: true`: a bare `new ToolContext(channel:
 'mcp')` (no `principal`) hits exactly the denial described above, one call at a time, with no
 documented way out before this factory existed.
+
+## Events: `tool.executing` / `tool.executed` / `tool.failed`
+
+Since 0.5 (the event-driven retrofit), `ToolRegistry` accepts an optional
+`Milpa\Interfaces\Event\MilpaEventDispatcherInterface` as its second constructor argument — the
+same nullable-dispatcher-in-the-ctor pattern `HumanVerifier` already uses below. Without one,
+`call()` behaves exactly as it did before 0.5: there is no interception point, and
+`ToolAuditLogger` still logs every call (see below) — "no dispatcher" never means "no audit
+trail", it only means "nothing can intercept."
+
+With a dispatcher wired, three events fire around every call:
+
+| Event | When | Carries | Slot? |
+|-------|------|---------|-------|
+| `tool.executing` | **PRE** — after resolve, validate/clamp, `PolicyGate::authorize()`, rate-limiting, and the confirm-gate have **all already run and passed** | `Events\ToolExecutingEvent($name, $ctx, $args)` | **Yes** — a `Milpa\Events\InterceptionSlot` travels alongside it |
+| `tool.executed` | **POST** — a call finished, live or via a cache short-circuit | `Events\ToolExecutedEvent($name, $ctx, $args, $result, $cacheServed)` | No — readonly notification |
+| `tool.failed` | **POST** — the tool's own callback threw | `Events\ToolFailedEvent($name, $ctx, $args, $exception, $tookMs)` | No — readonly notification |
+
+### The security anchor
+
+`tool.executing` is dispatched from exactly one place inside `ToolRegistry::call()`: *after*
+every gate — resolve → validate/clamp → authorize → rate-limit → confirm — has already run and
+said yes, and *before* `call_user_func()` ever invokes the tool's callback. This ordering is
+load-bearing, not incidental: a `tool.executing` listener (a cache plugin, say) only gets a turn
+once authorization has already cleared the call. A denied or rate-limited call returns before
+`tool.executing` is ever dispatched — the listener is never invoked for it, full stop. Moving this
+dispatch any earlier (e.g. "before validate" or "before authorize") would let a cache hit stand in
+for an authorization check that never ran — an auth bypass wearing a cache's clothes.
+
+### The cache-plugin recipe
+
+A listener on `tool.executing` can answer on the tool's behalf via the `InterceptionSlot`
+dispatched alongside the event — the tool's real callback never runs:
+
+```php
+use Milpa\Events\InterceptionSlot;
+use Milpa\ToolRuntime\Events\ToolExecutingEvent;
+use Milpa\ToolRuntime\ToolResult;
+
+$dispatcher->subscribe('tool.executing', function (string $eventName, array $payload): void {
+    /** @var ToolExecutingEvent $event */
+    $event = $payload['event'];
+    /** @var InterceptionSlot $slot */
+    $slot = $payload['slot'];
+
+    $cached = $myCache->get($event->name, $event->args);
+    if ($cached !== null) {
+        // Short-circuit: the real callback never runs; ToolRegistry::call() returns this
+        // result instead. tool.executed STILL fires afterwards, marked cacheServed: true —
+        // a cache hit is never invisible to audit/metrics listeners.
+        $slot->shortCircuit(ToolResult::success($cached));
+    }
+});
+
+$registry = new ToolRegistry($logger, $dispatcher);
+```
+
+Because the anchor sits strictly after `authorize()`, this cache plugin can **never** answer a
+call `PolicyGate` already denied — the security property, verified end-to-end (including a real
+`EventDispatcher`, a real denied principal, and an assertion that the cache listener's invocation
+count stays at zero) in `tests/Events/CacheShortCircuitTest.php`.
+
+A listener may instead call `$slot->stop()` (without `shortCircuit()`) for a pure veto — `call()`
+then returns `ToolResult::blocked('Tool execution vetoed by an event listener')` without ever
+invoking the callback, and without a replacement result.
+
+### `ToolAuditLogger` is a listener, not an imperative call
+
+`ToolRegistry`'s constructor subscribes its internal `ToolAuditLogger` to `tool.executed` /
+`tool.failed` whenever a dispatcher is supplied — `ToolAuditLogger::onToolExecuted()` /
+`onToolFailed()` reproduce the exact log lines the registry used to emit imperatively (including
+the soft-timeout warning, now driven off `$result->meta['timeout_exceeded']` instead of a direct
+call). When **no** dispatcher is wired, `call()` invokes those same listener methods directly
+instead of going through `dispatch()` — so "no dispatcher" still means "full audit trail", never
+"silently stopped logging."
+
+Validation failures, authorization denials, and rate-limit rejections keep logging exactly as
+they did before 0.5 (`logValidationFailure()` / `logAuthFailure()` / a direct `log()` call in the
+rate-limit branch) — those all happen *before* the security anchor, so there is no `tool.*` event
+yet dispatched for them to hang off.
 
 ## Verification: `request_verification` / `resolve_verification`
 
@@ -361,12 +447,14 @@ The types you construct and pass around day to day:
 | `ToolRegistry` | The pipeline: `register()` to add a tool by hand, `call()` to run resolve→validate→authorize→execute→audit, `getToolSummaries()` (plain-array LLM/MCP wire shape) / `getToolDefinitions()` (typed `list<ToolDefinition>`) / `getToolsWithinBudget()` for LLM/MCP exposure. |
 | `Rendering\RendererRegistry` | Picks a `ChannelRendererInterface` for a `ToolResult` based on `ToolContext::$channel`, falling back to a default renderer or raw JSON. |
 | `Contracts\LlmServiceInterface` | The seam a plugin implements to provide LLM access (`generateResponse()`) and other plugins consume to get one, without depending on a specific provider. |
+| `Events\ToolExecutingEvent` / `Events\ToolExecutedEvent` / `Events\ToolFailedEvent` | The three `tool.*` event VOs (0.5) dispatched around `ToolRegistry::call()` — see [Events](#events-toolexecuting--toolexecuted--toolfailed). |
 
 ## Requirements
 
 - PHP **≥ 8.3**
-- [`milpa/core`](https://packagist.org/packages/milpa/core) **^0.2**
+- [`milpa/core`](https://packagist.org/packages/milpa/core) **^0.5** (the `InterceptionSlot` / `MilpaEventDispatcherInterface` keystone the [Events](#events-toolexecuting--toolexecuted--toolfailed) seam is built on)
 - [`psr/log`](https://packagist.org/packages/psr/log) **^3**
+- [`milpa/events`](https://packagist.org/packages/milpa/events) *(optional, dev-only)* — the reference `MilpaEventDispatcherInterface` implementation; any conformant implementation works, this package has no hard dependency on it
 
 ## Documentation
 

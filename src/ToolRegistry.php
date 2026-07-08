@@ -14,7 +14,12 @@ declare(strict_types=1);
 
 namespace Milpa\ToolRuntime;
 
+use Milpa\Events\InterceptionSlot;
+use Milpa\Interfaces\Event\MilpaEventDispatcherInterface;
 use Milpa\ToolRuntime\Contracts\ToolContext;
+use Milpa\ToolRuntime\Events\ToolExecutedEvent;
+use Milpa\ToolRuntime\Events\ToolExecutingEvent;
+use Milpa\ToolRuntime\Events\ToolFailedEvent;
 use Psr\Log\LoggerInterface;
 use Milpa\Interfaces\Tooling\ToolRegistryInterface;
 use Milpa\ValueObjects\Tooling\ToolOptions;
@@ -43,15 +48,41 @@ class ToolRegistry implements ToolRegistryInterface
     private TokenEstimator $tokenEstimator;
     private LoggerInterface $logger;
     private ?RateLimiterInterface $rateLimiter = null;
+    private ?MilpaEventDispatcherInterface $dispatcher;
 
-    public function __construct(LoggerInterface $logger)
+    /**
+     * @param LoggerInterface                    $logger     PSR-3 logger for internal debug/warning output
+     * @param MilpaEventDispatcherInterface|null $dispatcher Optional event dispatcher (tool-runtime 0.5,
+     *                                                       event-driven retrofit — {@see
+     *                                                       \Milpa\ToolRuntime\Verification\HumanVerifier}
+     *                                                       pattern). `null` (the default) preserves
+     *                                                       today's behavior EXACTLY: no `tool.executing`
+     *                                                       interception point exists, so nothing can ever
+     *                                                       short-circuit or veto a call, and audit logging
+     *                                                       (via {@see ToolAuditLogger}) still fires on
+     *                                                       every path — {@see call()} invokes the audit
+     *                                                       listener methods directly when no dispatcher is
+     *                                                       wired, so "no dispatcher" never means "no audit
+     *                                                       trail". When a dispatcher IS supplied, this
+     *                                                       constructor subscribes the internal
+     *                                                       {@see ToolAuditLogger} to `tool.executed` /
+     *                                                       `tool.failed` exactly like any other plugin
+     *                                                       listener would — see the README's cache-plugin
+     *                                                       recipe for how a third party hooks the same
+     *                                                       `tool.executing` seam.
+     */
+    public function __construct(LoggerInterface $logger, ?MilpaEventDispatcherInterface $dispatcher = null)
     {
         $this->logger = $logger;
+        $this->dispatcher = $dispatcher;
         $this->validator = new SchemaValidator();
         $this->policyGate = new PolicyGate();
         $this->confirmationStore = new ConfirmationTokenStore();
         $this->auditLogger = new ToolAuditLogger($logger);
         $this->tokenEstimator = new TokenEstimator();
+
+        $this->dispatcher?->subscribe('tool.executed', $this->auditLogger->onToolExecuted(...));
+        $this->dispatcher?->subscribe('tool.failed', $this->auditLogger->onToolFailed(...));
     }
 
     /**
@@ -447,7 +478,44 @@ class ToolRegistry implements ToolRegistryInterface
             $args = $originalArgs;
         }
 
-        // 5. Execute
+        // 5. THE ANCHOR (tool-runtime 0.5, event-driven retrofit, security-critical — do NOT move
+        // this earlier). Every gate above — resolve, validate/clamp, PolicyGate::authorize(),
+        // rate-limiting, and the confirm-gate — has ALREADY run and ALREADY passed by this line.
+        // Only now does a `tool.executing` listener (e.g. a cache plugin) get a turn to answer on
+        // the tool's behalf. Dispatching this any earlier would let a cache short-circuit stand in
+        // for authorization — an auth bypass, not a cache. See
+        // docs/superpowers/specs/2026-07-08-event-driven-familia-design.md §tool-runtime 0.5.
+        $slot = new InterceptionSlot();
+        $this->dispatcher?->dispatch(
+            'tool.executing',
+            ['event' => new ToolExecutingEvent($name, $ctx, $args), 'slot' => $slot]
+        );
+
+        if ($slot->hasResult()) {
+            // Short-circuit: a listener (e.g. cache) supplied a result — the tool's real callback
+            // never runs. INVARIANT: a cache hit must still be visible to audit, so `tool.executed`
+            // is always emitted here, marked cacheServed: true, before returning.
+            $took_ms = $this->elapsed($startTime);
+            $shortCircuited = $slot->getResult();
+            $toolResult = $shortCircuited instanceof ToolResult
+                ? $shortCircuited
+                : ToolResult::success($shortCircuited, null, $this->buildMeta($name, $took_ms, $ctx));
+
+            $this->emitExecuted(new ToolExecutedEvent($name, $ctx, $args, $toolResult, cacheServed: true));
+
+            return $toolResult;
+        }
+
+        if ($slot->isStopped()) {
+            // Pure veto: a listener stopped propagation without supplying a replacement result
+            // (InterceptionSlot::stop() rather than shortCircuit()). The class never executes.
+            $took_ms = $this->elapsed($startTime);
+
+            return ToolResult::blocked('Tool execution vetoed by an event listener')
+                ->withMeta($this->buildMeta($name, $took_ms, $ctx));
+        }
+
+        // 6. Execute
         try {
             // Inject context into args for tools that need it
             $args['_ctx'] = $ctx;
@@ -469,9 +537,9 @@ class ToolRegistry implements ToolRegistryInterface
                 $toolResult = ToolResult::success($result, null, $this->buildMeta($name, $took_ms, $ctx));
             }
 
-            // Soft timeout enforcement: log warning and add metadata if exceeded
+            // Soft timeout enforcement: add metadata if exceeded (the ToolAuditLogger listener
+            // logs the warning off this metadata — see ToolAuditLogger::onToolExecuted()).
             if ($executionTime > $timeoutSeconds) {
-                $this->auditLogger->logTimeout($ctx, $name, $executionTime, $timeoutSeconds);
                 $toolResult = $toolResult->withMeta([
                     'timeout_exceeded' => true,
                     'execution_time' => round($executionTime, 3),
@@ -479,17 +547,20 @@ class ToolRegistry implements ToolRegistryInterface
                 ]);
             }
 
-            // 6. Audit
-            $outputSize = is_string($result) ? strlen($result) : null;
-            $this->auditLogger->log($ctx, $name, $args, true, null, $took_ms, $outputSize);
+            // 7. Audit — via the `tool.executed` event (ToolAuditLogger is a listener as of
+            // tool-runtime 0.5; see emitExecuted()).
+            $this->emitExecuted(new ToolExecutedEvent($name, $ctx, $args, $toolResult, cacheServed: false));
 
             return $toolResult;
 
         } catch (\Throwable $e) {
             $took_ms = $this->elapsed($startTime);
 
-            $this->auditLogger->log($ctx, $name, $args, false, 'EXCEPTION', $took_ms);
             $this->logger->error("[ToolRegistry] {$name} threw exception: " . $e->getMessage());
+
+            // Audit — via the `tool.failed` event (ToolAuditLogger is a listener as of
+            // tool-runtime 0.5; see emitFailed()).
+            $this->emitFailed(new ToolFailedEvent($name, $ctx, $args, $e, $took_ms));
 
             return ToolResult::error(
                 $e->getMessage(),
@@ -497,6 +568,38 @@ class ToolRegistry implements ToolRegistryInterface
                 $this->buildMeta($name, $took_ms, $ctx) + ['code' => ToolResult::INTERNAL_ERROR]
             );
         }
+    }
+
+    /**
+     * Emit `tool.executed`, guaranteeing the audit trail fires whether or not a dispatcher is
+     * wired (tool-runtime 0.5).
+     *
+     * With a dispatcher: dispatches the event normally — {@see ToolAuditLogger} (subscribed in
+     * {@see __construct()}) and any other listener react exactly like real subscribers. Without
+     * one: calls {@see ToolAuditLogger::onToolExecuted()} directly, so "no dispatcher wired" still
+     * means "audit logging still happens", matching the pre-0.5 behavior byte-for-byte.
+     */
+    private function emitExecuted(ToolExecutedEvent $event): void
+    {
+        if ($this->dispatcher !== null) {
+            $this->dispatcher->dispatch('tool.executed', ['event' => $event]);
+            return;
+        }
+
+        $this->auditLogger->onToolExecuted('tool.executed', ['event' => $event]);
+    }
+
+    /**
+     * Emit `tool.failed` — see {@see emitExecuted()} for the no-dispatcher fallback rationale.
+     */
+    private function emitFailed(ToolFailedEvent $event): void
+    {
+        if ($this->dispatcher !== null) {
+            $this->dispatcher->dispatch('tool.failed', ['event' => $event]);
+            return;
+        }
+
+        $this->auditLogger->onToolFailed('tool.failed', ['event' => $event]);
     }
 
     /**
