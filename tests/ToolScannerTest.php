@@ -143,6 +143,37 @@ class TypeTestService
     }
 }
 
+// Service covering the object-param gap fix (tool-runtime 0.6) — a PHP `array $param`
+// declared with `#[Param(type: 'object', ...)]` must produce JSON-Schema `type: object` and
+// accept an associative payload, instead of the inferred `type: array` (which requires a list
+// and rejects `{"post_id": 1}` — see orch-f4-report.md finding #1).
+class ObjectParamToolService
+{
+    #[Tool('update_post', 'Update fields on a post')]
+    public function updatePost(
+        int $post_id,
+        #[Param(
+            'Fields to update',
+            type: 'object',
+            properties: [
+                'title' => ['type' => 'string'],
+                'body' => ['type' => 'string'],
+            ]
+        )]
+        array $updates
+    ): array {
+        return ['post_id' => $post_id, 'updates' => $updates];
+    }
+
+    #[Tool('open_object_param', 'Tool with an object param and no declared shape')]
+    public function openObjectParam(
+        #[Param('Arbitrary payload', type: 'object')]
+        array $payload
+    ): array {
+        return ['payload' => $payload];
+    }
+}
+
 class ToolScannerTest extends TestCase
 {
     private ToolRegistry $registry;
@@ -484,5 +515,110 @@ class ToolScannerTest extends TestCase
 
         // TypeTestService has 8 tool methods
         $this->assertEquals(8, $count);
+    }
+
+    // ========== Object-param gap fix (tool-runtime 0.6) ==========
+
+    public function testObjectParamGeneratesTypeObjectSchema(): void
+    {
+        $service = new ObjectParamToolService();
+        $this->scanner->scan($service);
+
+        $tools = $this->registry->getToolSummaries();
+        $updateTool = array_values(array_filter($tools, fn ($t) => $t['name'] === 'update_post'))[0];
+
+        $this->assertEquals('object', $updateTool['inputSchema']['properties']['updates']['type']);
+        // Not the inferred 'array' the bare PHP `array $updates` type would otherwise produce.
+        $this->assertNotEquals('array', $updateTool['inputSchema']['properties']['updates']['type']);
+    }
+
+    public function testObjectParamSchemaIncludesDeclaredProperties(): void
+    {
+        $service = new ObjectParamToolService();
+        $this->scanner->scan($service);
+
+        $tools = $this->registry->getToolSummaries();
+        $updateTool = array_values(array_filter($tools, fn ($t) => $t['name'] === 'update_post'))[0];
+
+        $this->assertEquals(
+            ['title' => ['type' => 'string'], 'body' => ['type' => 'string']],
+            $updateTool['inputSchema']['properties']['updates']['properties']
+        );
+    }
+
+    public function testObjectParamAcceptsAssociativePayloadAndTheMethodReceivesItIntact(): void
+    {
+        // The exact repro from orch-f4-report.md finding #1: `{"post_id": 1}` decodes (upstream,
+        // at the JSON transport boundary) to an associative PHP array, which previously failed
+        // SchemaValidator's `array_is_list()` check because the inferred schema type was 'array'.
+        $service = new ObjectParamToolService();
+        $this->scanner->scan($service);
+
+        $result = $this->registry->call('update_post', [
+            'post_id' => 1,
+            'updates' => ['title' => 'New title', 'body' => 'New body'],
+        ]);
+
+        $this->assertTrue($result->success, $result->error ?? '');
+        $this->assertEquals(1, $result->data['post_id']);
+        // The method receives a plain associative array — no hand json_decode() required.
+        $this->assertSame(['title' => 'New title', 'body' => 'New body'], $result->data['updates']);
+    }
+
+    public function testObjectParamWithoutDeclaredPropertiesAcceptsArbitraryPayload(): void
+    {
+        $service = new ObjectParamToolService();
+        $this->scanner->scan($service);
+
+        $tools = $this->registry->getToolSummaries();
+        $openTool = array_values(array_filter($tools, fn ($t) => $t['name'] === 'open_object_param'))[0];
+
+        // No declared shape -> no `properties` key at all on the param schema (an open object;
+        // never an empty array that would need json-safe stdClass normalization).
+        $this->assertArrayNotHasKey('properties', $openTool['inputSchema']['properties']['payload']);
+
+        $result = $this->registry->call('open_object_param', ['payload' => ['anything' => 'goes', 'nested' => ['x' => 1]]]);
+
+        $this->assertTrue($result->success, $result->error ?? '');
+        $this->assertSame(['anything' => 'goes', 'nested' => ['x' => 1]], $result->data['payload']);
+    }
+
+    public function testObjectParamAcceptsEmptyPayload(): void
+    {
+        $service = new ObjectParamToolService();
+        $this->scanner->scan($service);
+
+        // `{}` decodes to `[]` in PHP — must still validate as an object, not be rejected.
+        $result = $this->registry->call('open_object_param', ['payload' => []]);
+
+        $this->assertTrue($result->success, $result->error ?? '');
+        $this->assertSame([], $result->data['payload']);
+    }
+
+    public function testObjectParamRejectsAScalarPayload(): void
+    {
+        $service = new ObjectParamToolService();
+        $this->scanner->scan($service);
+
+        $result = $this->registry->call('open_object_param', ['payload' => 'not-an-object']);
+
+        $this->assertFalse($result->success);
+        $this->assertStringContainsString('object', $result->error);
+    }
+
+    public function testListArrayParamStillRequiresAListNoRegression(): void
+    {
+        // Regression guard: a plain (non-overridden) `array $items` param must keep generating
+        // `type: array` and keep requiring a JSON-Schema list — the object-param override is
+        // strictly opt-in via `#[Param(type: 'object')]` and must not change default behavior.
+        $service = new TypeTestService();
+        $this->scanner->scan($service);
+
+        $validList = $this->registry->call('array_param', ['items' => ['a', 'b', 'c']]);
+        $this->assertTrue($validList->success, $validList->error ?? '');
+
+        $invalidAssoc = $this->registry->call('array_param', ['items' => ['key' => 'value']]);
+        $this->assertFalse($invalidAssoc->success);
+        $this->assertStringContainsString('array', $invalidAssoc->error);
     }
 }

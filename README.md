@@ -76,6 +76,46 @@ trusted local stdio MCP server process (no per-caller auth — see
 [Authorize](#the-pipeline) below), `ToolContext::telegram($chatId, $userId)`, or a custom
 `new ToolContext(...)` for a web session.
 
+### Object-shaped parameters
+
+A PHP `array` has no native type that maps to JSON-Schema `type: object` on its own —
+without an override, `ToolScanner` infers `array` -> schema `type: array`, and
+`SchemaValidator` then requires that value to be a JSON *list*, rejecting an associative
+payload like `{"post_id": 1}` outright. Pass `type: 'object'` on `#[Param]` to opt a PHP
+`array $param` into `type: object` instead; add `properties`/`requiredProperties` to declare
+its shape (both optional — omit them for an open object with no declared shape):
+
+```php
+#[Tool('update_post', 'Update fields on a post')]
+public function updatePost(
+    int $post_id,
+    #[Param('Fields to update', type: 'object', properties: [
+        'title' => ['type' => 'string'],
+        'body' => ['type' => 'string'],
+    ])]
+    array $updates
+): ToolResult {
+    // $updates arrives as a plain associative array — ['title' => ..., 'body' => ...] —
+    // no manual json_decode() needed; the host's JSON transport already decoded it that way.
+    return ToolResult::success(['post_id' => $post_id, 'updates' => $updates]);
+}
+```
+
+This is purely opt-in (tool-runtime 0.6): a bare `array $param` with no `#[Param(type: ...)]`
+override keeps generating `type: array` and keeps requiring a list, exactly as before.
+
+### Parameter names on the wire
+
+`ToolScanner` takes each wire argument name straight from `ReflectionParameter::getName()` —
+there is no snake_case conversion. A PHP parameter `string $instanceId` produces the schema
+property `instanceId`, not `instance_id`; a caller sending `instance_id` gets a "missing
+required field" error. Every single-word parameter is unaffected (there is nothing to
+convert), but a multi-word wire name must be matched by naming the PHP parameter itself in
+that exact case — e.g. `string $instance_id` for a `snake_case`-conventioned tool family, or
+`string $instanceId` for a `camelCase` one. Pick the PHP parameter name to match your tool
+family's own wire convention; `#[Param]`'s `description`/`type`/etc. do not rename the
+property.
+
 ## The pipeline
 
 Every `ToolRegistry::call()` runs the same six steps, in order, regardless of who is

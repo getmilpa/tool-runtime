@@ -329,6 +329,104 @@ class SchemaValidatorTest extends TestCase
         $this->assertFalse($invalidResult->valid);
     }
 
+    // ========== Object-param gap fix (tool-runtime 0.6) ==========
+    // See orch-f4-report.md finding #1: a `type: object` property must accept an associative
+    // payload — e.g. `{"post_id": 1}` decoded to `['post_id' => 1]` — WITHOUT running
+    // `array_is_list()` on it (that check stays reserved for `type: array`, below).
+
+    public function testValidateObjectTypeAcceptsAssociativeArray(): void
+    {
+        $schema = [
+            'type' => 'object',
+            'properties' => [
+                'updates' => ['type' => 'object'],
+            ],
+        ];
+
+        $result = $this->validator->validate(['updates' => ['post_id' => 1, 'title' => 'New']], $schema);
+
+        $this->assertTrue($result->valid);
+    }
+
+    public function testValidateObjectTypeRejectsListArray(): void
+    {
+        $schema = [
+            'type' => 'object',
+            'properties' => [
+                'updates' => ['type' => 'object'],
+            ],
+        ];
+
+        $result = $this->validator->validate(['updates' => ['a', 'b', 'c']], $schema);
+
+        $this->assertFalse($result->valid);
+        $this->assertStringContainsString('Expected object', $result->getErrorMessage());
+    }
+
+    public function testValidateObjectTypeAcceptsEmptyPayload(): void
+    {
+        // `{}` decodes to `[]` in PHP — `array_is_list([])` is `true`, so a naive
+        // `!array_is_list()` check would wrongly reject an empty object. Must validate.
+        $schema = [
+            'type' => 'object',
+            'properties' => [
+                'updates' => ['type' => 'object'],
+            ],
+        ];
+
+        $result = $this->validator->validate(['updates' => []], $schema);
+
+        $this->assertTrue($result->valid);
+    }
+
+    public function testValidateObjectTypeAcceptsStdClassInstance(): void
+    {
+        $schema = [
+            'type' => 'object',
+            'properties' => [
+                'updates' => ['type' => 'object'],
+            ],
+        ];
+
+        $result = $this->validator->validate(['updates' => new \stdClass()], $schema);
+
+        $this->assertTrue($result->valid);
+    }
+
+    public function testValidateObjectTypeRejectsScalar(): void
+    {
+        $schema = [
+            'type' => 'object',
+            'properties' => [
+                'updates' => ['type' => 'object'],
+            ],
+        ];
+
+        $result = $this->validator->validate(['updates' => 'not-an-object'], $schema);
+
+        $this->assertFalse($result->valid);
+        $this->assertStringContainsString('Expected object', $result->getErrorMessage());
+    }
+
+    public function testValidateArrayTypeStillRejectsAssociativeArrayNoRegression(): void
+    {
+        // Regression guard: 'array' must keep meaning "JSON list" exactly as before — the new
+        // 'object' branch above must not loosen this check.
+        $schema = [
+            'type' => 'object',
+            'properties' => [
+                'items' => ['type' => 'array'],
+            ],
+        ];
+
+        $validList = $this->validator->validate(['items' => [1, 2, 3]], $schema);
+        $this->assertTrue($validList->valid);
+
+        $invalidAssoc = $this->validator->validate(['items' => ['post_id' => 1]], $schema);
+        $this->assertFalse($invalidAssoc->valid);
+        $this->assertStringContainsString('Expected array', $invalidAssoc->getErrorMessage());
+    }
+
     public function testValidationResultErrorMessage(): void
     {
         $result = ValidationResult::failure(['Error 1', 'Error 2', 'Error 3']);

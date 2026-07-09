@@ -150,7 +150,12 @@ class SchemaValidator
                 'number' => is_numeric($value),
                 'boolean' => is_bool($value),
                 'array' => is_array($value) && array_is_list($value),
-                'object' => is_array($value) && !array_is_list($value),
+                // An associative PHP array (`{"post_id": 1}` decoded with `assoc: true`) OR a
+                // `stdClass`/object instance both count as a JSON object. `array_is_list()`
+                // considers an EMPTY array a list, so it is special-cased here too — an empty
+                // object (`{}`) must validate, not be rejected as "not an object" (tool-runtime
+                // 0.6; see SchemaValidatorTest::testValidateObjectTypeAcceptsEmptyPayload()).
+                'object' => is_object($value) || (is_array($value) && ($value === [] || !array_is_list($value))),
                 default => true,
             };
 

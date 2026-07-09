@@ -119,6 +119,12 @@ class ToolScanner
     /**
      * Build schema for a single parameter.
      *
+     * The JSON-Schema `type` is inferred from the PHP parameter's native type
+     * (`int`/`float`/`bool`/`array`/`string`); a `#[Param(type: ...)]` override (tool-runtime
+     * 0.6) can replace that inferred type — e.g. a PHP `array $param` declared with
+     * `type: 'object'` produces `type: object` instead of `type: array`, so
+     * {@see SchemaValidator} validates it as an associative payload rather than requiring a list.
+     *
      * @return array<string, mixed>
      */
     private function buildParamSchema(ReflectionParameter $param): array
@@ -162,6 +168,25 @@ class ToolScanner
             if ($paramAttr->clamp !== null && count($paramAttr->clamp) === 2) {
                 $schema['minimum'] = $paramAttr->clamp[0];
                 $schema['maximum'] = $paramAttr->clamp[1];
+            }
+
+            // Explicit `type` override (tool-runtime 0.6) — lets a PHP `array $param` declare
+            // itself as JSON-Schema `type: object` instead of the inferred `type: array`. Every
+            // other PHP-type-derived schema above is untouched unless the tool author opts in.
+            if ($paramAttr->type !== null) {
+                $schema['type'] = $paramAttr->type;
+            }
+
+            // Nested object shape — only added when the tool author actually declared it, so a
+            // bare `type: 'object'` param (no declared shape) never gets an empty `properties: []`
+            // that would need the wire-safety stdClass normalization {@see
+            // ToolRegistry::jsonSafeSchema()} applies to the top-level schema.
+            if ($paramAttr->properties !== null) {
+                $schema['properties'] = $paramAttr->properties;
+            }
+
+            if ($paramAttr->requiredProperties !== null) {
+                $schema['required'] = $paramAttr->requiredProperties;
             }
         }
 
