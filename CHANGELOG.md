@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.5.1](https://github.com/getmilpa/tool-runtime/compare/v0.5.0...v0.5.1) (2026-07-09)
+
+
+### Features
+
+* object-shaped tool parameters via #[Param(type: object)] ([4f75d6b](https://github.com/getmilpa/tool-runtime/commit/4f75d6b62b6aa7fb179f8bb14d84ea8caabdc312))
+
+
+### Miscellaneous Chores
+
+* release 0.5.1 ([6ca7425](https://github.com/getmilpa/tool-runtime/commit/6ca742572961a7952103564a38968a241a7503a3))
+
 ## [0.5.0](https://github.com/getmilpa/tool-runtime/compare/v0.4.0...v0.5.0) (2026-07-08)
 
 
