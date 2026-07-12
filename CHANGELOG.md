@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.2](https://github.com/getmilpa/tool-runtime/compare/v0.5.1...v0.5.2) (2026-07-12)
+
+
+### Bug Fixes
+
+* receive milpa/core 0.6 — pin bump ([0683c0f](https://github.com/getmilpa/tool-runtime/commit/0683c0f0003a9f282d3ba828a934ce174dff8f28))
+
 ## [0.5.1](https://github.com/getmilpa/tool-runtime/compare/v0.5.0...v0.5.1) (2026-07-09)
 
 
