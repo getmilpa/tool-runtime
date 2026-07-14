@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/getmilpa/tool-runtime/compare/v0.5.2...v0.6.0) (2026-07-14)
+
+
+### Features
+
+* ToolContext::web + unknown channel fails closed ([62f0877](https://github.com/getmilpa/tool-runtime/commit/62f0877096094de1676740e80f8a3ae508f6bbb0))
+
 ## [0.5.2](https://github.com/getmilpa/tool-runtime/compare/v0.5.1...v0.5.2) (2026-07-12)
 
 
