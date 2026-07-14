@@ -492,7 +492,7 @@ The types you construct and pass around day to day:
 ## Requirements
 
 - PHP **≥ 8.3**
-- [`milpa/core`](https://packagist.org/packages/milpa/core) **^0.5** (the `InterceptionSlot` / `MilpaEventDispatcherInterface` keystone the [Events](#events-toolexecuting--toolexecuted--toolfailed) seam is built on)
+- [`milpa/core`](https://packagist.org/packages/milpa/core) **^0.6** (the `InterceptionSlot` / `MilpaEventDispatcherInterface` keystone the [Events](#events-toolexecuting--toolexecuted--toolfailed) seam is built on)
 - [`psr/log`](https://packagist.org/packages/psr/log) **^3**
 - [`milpa/events`](https://packagist.org/packages/milpa/events) *(optional, dev-only)* — the reference `MilpaEventDispatcherInterface` implementation; any conformant implementation works, this package has no hard dependency on it
 
@@ -509,8 +509,8 @@ issues via [SECURITY.md](SECURITY.md), and note that this project follows a
 
 ## License
 
-[Apache-2.0](LICENSE) © TeamX Agency.
+[Apache-2.0](LICENSE) © Rodrigo Vicente - TeamX Agency.
 
 ---
 
-Milpa is designed, built, and maintained by **[TeamX Agency](https://teamx.agency/?utm_source=github&utm_medium=readme&utm_campaign=milpa&utm_content=tool-runtime)**.
+Milpa is designed, built, and maintained by **[Rodrigo Vicente - TeamX Agency](https://teamx.agency/?utm_source=github&utm_medium=readme&utm_campaign=milpa&utm_content=tool-runtime)**.

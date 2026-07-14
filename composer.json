@@ -3,6 +3,12 @@
   "description": "AI tool-execution runtime for the Milpa PHP framework: registry pipeline (resolve, validate, authorize, execute, audit), #[Tool] attributes, schema validation, policy gate, rate limiting, channel rendering, and human verification.",
   "type": "library",
   "license": "Apache-2.0",
+  "authors": [
+    {
+      "name": "Rodrigo Vicente - TeamX Agency",
+      "homepage": "https://teamx.agency"
+    }
+  ],
   "require": {
     "php": ">=8.3",
     "milpa/core": "^0.6",

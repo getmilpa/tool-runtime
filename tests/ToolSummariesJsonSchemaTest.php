@@ -3,7 +3,7 @@
 /*
  * This file is part of milpa/tool-runtime.
  *
- * (c) TeamX Agency — https://teamx.agency <hola@teamx.agency>
+ * (c) Rodrigo Vicente - TeamX Agency — https://teamx.agency <hola@teamx.agency>
  *
  * For the full copyright and license information, please view the LICENSE
  * file that was distributed with this source code.

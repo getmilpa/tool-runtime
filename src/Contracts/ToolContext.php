@@ -3,7 +3,7 @@
 /**
  * This file is part of Milpa ToolRuntime — the AI tool-execution runtime of the Milpa PHP framework.
  *
- * (c) TeamX Agency — https://teamx.agency <hola@teamx.agency>
+ * (c) Rodrigo Vicente - TeamX Agency — https://teamx.agency <hola@teamx.agency>
  *
  * @license Apache-2.0
  *
@@ -245,6 +245,37 @@ class ToolContext
             request_id: ToolMeta::generateRequestId(),
             extra: ['chat_id' => $chatId],
             mode: $mode
+        );
+    }
+
+    /**
+     * Create context for an authenticated web (HTTP) caller.
+     *
+     * The end of the faked wildcard on the web surface. Where {@see cli()} and {@see stdio()} encode
+     * *process-level* trust with a blanket `['*']`, a web caller is a real, per-request identity — so
+     * this carries the EXACT scopes the host verified, never a wildcard. A caller with no scopes gets
+     * no scopes, and the `web` channel's built-in policy in {@see \Milpa\ToolRuntime\PolicyGate}
+     * (`allow_all: false`, `require_auth: true`) will then deny any scope-protected tool. That denial
+     * is the point: the transport stops being trusted, the verified context is.
+     *
+     * **Decoupled on purpose.** This takes primitives — a principal id and a scope list — NOT a
+     * milpa/auth `Actor`. tool-runtime stays a leaf with zero dependency on the auth package; the
+     * HTTP host (e.g. the skeleton's HttpProjector), which already owns both, is what maps
+     * `Actor{id, scopes}` → `web($actor->id, $actor->scopes)`. The coupling lives up in the host that
+     * depends on both, never down here.
+     *
+     * @param string        $principal the authenticated identity's id — must be non-empty (an empty
+     *                                 principal trips {@see \Milpa\ToolRuntime\PolicyGate}'s
+     *                                 `require_auth` check for the `web` channel)
+     * @param array<string> $scopes    the exact scopes the host verified for this caller — the real
+     *                                 set the identity holds, never a blanket `['*']`
+     */
+    public static function web(string $principal, array $scopes): self
+    {
+        return new self(
+            principal: $principal,
+            channel: 'web',
+            scopes: $scopes,
         );
     }
 
