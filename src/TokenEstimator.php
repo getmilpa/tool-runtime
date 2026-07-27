@@ -119,10 +119,19 @@ class TokenEstimator
             return self::MODEL_LIMITS[$model];
         }
 
-        // Check partial match (e.g., "gpt-4o-2024-05-13" matches "gpt-4o")
-        foreach (self::MODEL_LIMITS as $prefix => $limit) {
+        // Check partial match (e.g., "gpt-4o-2024-05-13" matches "gpt-4o").
+        //
+        // Longest prefix wins, not the first one declared: several keys here
+        // are prefixes of others ("gpt-4" of "gpt-4o" and "gpt-4-turbo"), so
+        // taking the first match resolved every dated gpt-4o to gpt-4's 8192
+        // and handed the host a tool budget fifteen times smaller than the
+        // model actually had.
+        $prefixes = array_keys(self::MODEL_LIMITS);
+        usort($prefixes, static fn (string $a, string $b): int => \strlen($b) <=> \strlen($a));
+
+        foreach ($prefixes as $prefix) {
             if (str_starts_with($model, $prefix)) {
-                return $limit;
+                return self::MODEL_LIMITS[$prefix];
             }
         }
 
