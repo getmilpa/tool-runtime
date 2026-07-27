@@ -643,6 +643,24 @@ class ToolRegistry implements ToolRegistryInterface
     }
 
     /**
+     * ¿Hay un rate limiter conectado? Lectura pura para la inspección (ADR#13): permite marcar el
+     * paso rate_limit como Skipped (no wired) en vez de Conditional cuando no hay limiter.
+     */
+    public function hasRateLimiter(): bool
+    {
+        return $this->rateLimiter !== null;
+    }
+
+    /**
+     * ¿Hay un event dispatcher conectado? Lectura pura para la inspección (ADR#13): el anchor
+     * tool.executing y sus ramas cache/veto son Skipped cuando no hay dispatcher.
+     */
+    public function hasDispatcher(): bool
+    {
+        return $this->dispatcher !== null;
+    }
+
+    /**
      * Get policy gate for customization.
      */
     public function getPolicyGate(): PolicyGate

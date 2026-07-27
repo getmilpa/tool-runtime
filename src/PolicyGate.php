@@ -99,6 +99,26 @@ class PolicyGate
     }
 
     /**
+     * La channel policy efectiva de un canal (lectura pura para la inspección, ADR#13) — delega en
+     * el mismo {@see policyFor()} que usa authorize()/requiresConfirmation(), así el plan renderea
+     * la MISMA política que el runtime consulta, con el mismo fail-closed para canales desconocidos.
+     *
+     * @return array<string, mixed>
+     */
+    public function channelPolicy(string $channel): array
+    {
+        return $this->policyFor($channel);
+    }
+
+    /**
+     * ¿Hay un provider de reglas DB conectado? Lectura pura para la inspección (ADR#13).
+     */
+    public function hasRuleProvider(): bool
+    {
+        return $this->ruleProvider !== null;
+    }
+
+    /**
      * Authorize a tool call.
      *
      * @param ToolContext    $ctx  The execution context
@@ -114,7 +134,9 @@ class PolicyGate
         $policy = $this->policyFor($ctx->channel);
 
         // 1. Check require_auth first - if channel requires auth, principal must be set
-        if (($policy['require_auth'] ?? false) && empty($ctx->principal)) {
+        // Note: Use explicit null/empty-string checks instead of empty() to avoid treating "0" as falsy.
+        // The principal is typed ?string, so null or "" are the only genuine "no principal" states.
+        if (($policy['require_auth'] ?? false) && ($ctx->principal === null || $ctx->principal === '')) {
             return AuthorizationResult::denied(
                 "channel '{$ctx->channel}' requires an authenticated principal (require_auth) — none provided."
             );

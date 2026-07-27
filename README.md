@@ -182,6 +182,47 @@ boundary" shape `ToolContext::cli()` already uses for CLI scripts. This exists b
 'mcp')` (no `principal`) hits exactly the denial described above, one call at a time, with no
 documented way out before this factory existed.
 
+### Inspecting the pipeline: `InvocationPlan` + `coa:tools inspect`
+
+The six steps above are the law that already governs every call. `InvocationPlan` makes that law
+**statically visible without executing anything** — the read-only counterpart to plan-mode. Plan-mode
+dry-runs *one call* (real args, real authorize, stops before Execute); `InvocationPlan` x-rays the
+*wiring itself* — for a given tool on a given channel, which steps would run, which are inert, and
+why — without a call at all.
+
+`InvocationPlanBuilder::build(ToolDefinition $tool, ToolContext $ctx, RegistryWiring $wiring)` reads
+a live `ToolRegistry` and emits an `InvocationPlan`: an ordered `list<InvocationStep>`, one per
+pipeline stage (`Inspection\InvocationStepKind` enumerates all eleven — the six narrative steps above,
+un-collapsed: `Validate`/`Clamp` split, `PlanMode`/`Confirm` split, plus `EmitExecuting`,
+`ContainException`, and `Audit` as distinct stages). Each `InvocationStep` carries its
+`InvocationStepRole` (`Guard`, `Transform`, `Branch`, `Hook`, `Execution`, `Boundary`, `Outcome` — so
+`ContainException` is a `Boundary` that `wraps` Execute, and `Audit` is an `Outcome` that spans several
+terminal paths, not a linear last step) and its `StepPresence`:
+
+- **`Active`** — runs for this tool+channel.
+- **`Conditional`** — may run depending on data known only at call time.
+- **`Dormant`** — the rule exists but current static facts make it *impossible* to fire. The
+  `#[Tool]` attribute has no `mutating` parameter, so every scanned tool is `mutating: false`, which
+  leaves `block_mutating`, `require_confirmation_for_mutating`, and the 5×-rate-cost permanently
+  Dormant. The plan says so instead of pretending they guard anything.
+- **`Skipped`** — the subsystem is not wired (no rate limiter, no dispatcher, no rule provider on
+  this registry).
+
+The plan never guesses — it reports what the registry admits it has, through the read-only accessors
+the builder derives presence from: `ToolRegistry::hasRateLimiter()` / `hasDispatcher()` and
+`PolicyGate::channelPolicy()` / `hasRuleProvider()`. And it never fabricates a caller: with no actor
+supplied on an auth-requiring channel, the context is genuinely anonymous (`principal: null`) and the
+plan honestly predicts the denial. Its guiding rule (ADR#13): *inspection must describe what the
+runtime actually executes, not an aspirational pipeline* — so `Audit`'s source enumerates its real
+coverage (validation-failure, authorization-failure, rate-limit, cache-hit, execute-success,
+execute-failure) and, just as honestly, the four terminal paths it does **not** audit (resolve-miss,
+plan-mode, confirmation-request, veto).
+
+`coa:tools inspect <tool>` is the CLI projection of the same `InvocationPlan` — a host command in the
+`MilpaToolRuntimePlugin` adapter (like `coa:tools`), not the runtime itself. `--channel` picks the
+channel, `--actor`/`--scope` supply a caller to inspect (never fabricated when omitted), and `--json`
+emits the whole plan (`schemaVersion`, `context`, `assumptions`, `wiring`, `steps`) for agents.
+
 ## Events: `tool.executing` / `tool.executed` / `tool.failed`
 
 Since 0.5 (the event-driven retrofit), `ToolRegistry` accepts an optional
@@ -473,7 +514,7 @@ assume a flat array — this is defined and enforced by the event classes' own d
 | Layer | Package | Owns |
 |-------|---------|------|
 | Contracts | `milpa/core` | `ToolProviderInterface`, `ToolRegistryInterface`, `VerifierInterface`, capability/verification value objects and events — the seams, not the engine. |
-| **Runtime** | **`milpa/tool-runtime`** (this package) | The concrete `ToolRegistry` pipeline, `#[Tool]`/`#[Param]` attributes + `ToolScanner`, `SchemaValidator`, `PolicyGate`, rate limiting, channel rendering, `ToolAuditLogger`, and the `HumanVerifier` reference verifier (`request_verification` / `resolve_verification`). |
+| **Runtime** | **`milpa/tool-runtime`** (this package) | The concrete `ToolRegistry` pipeline, `#[Tool]`/`#[Param]` attributes + `ToolScanner`, `SchemaValidator`, `PolicyGate`, rate limiting, channel rendering, `ToolAuditLogger`, the `HumanVerifier` reference verifier (`request_verification` / `resolve_verification`), and the read-only `Inspection\` pipeline model (`InvocationPlanBuilder` → `InvocationPlan`) behind `coa:tools inspect`. |
 | Your app | your host / plugins | Concrete `PolicyRuleProviderInterface` (e.g. Doctrine-backed rules), `LoggerInterface`, channel renderers, and where policy decisions and audit logs are actually persisted. |
 
 ## API de facto
@@ -484,10 +525,11 @@ The types you construct and pass around day to day:
 |------|------------|
 | `Contracts\ToolContext` | Who/where/what-scopes for one call — `principal`, `channel`, `scopes`, `mode`. Named constructors per channel: `cli()`, `mcp()`, `stdio()` (trusted local stdio MCP server), `telegram()`. |
 | `ToolResult` | The uniform return shape — `success`, `data`, `message`, `error`, `meta`. Factories for common shapes: `success()`, `error()`, `paginated()`, `detail()`, `confirmation()`, `blocked()`. |
-| `ToolRegistry` | The pipeline: `register()` to add a tool by hand, `call()` to run resolve→validate→authorize→execute→audit, `getToolSummaries()` (plain-array LLM/MCP wire shape) / `getToolDefinitions()` (typed `list<ToolDefinition>`) / `getToolsWithinBudget()` for LLM/MCP exposure. |
+| `ToolRegistry` | The pipeline: `register()` to add a tool by hand, `call()` to run resolve→validate→authorize→execute→audit, `getToolSummaries()` (plain-array LLM/MCP wire shape) / `getToolDefinitions()` (typed `list<ToolDefinition>`) / `getToolsWithinBudget()` for LLM/MCP exposure; read-only introspection via `hasRateLimiter()` / `hasDispatcher()` (and `PolicyGate::channelPolicy()` / `hasRuleProvider()`) — what the `Inspection\` builder reads without ever calling. |
 | `Rendering\RendererRegistry` | Picks a `ChannelRendererInterface` for a `ToolResult` based on `ToolContext::$channel`, falling back to a default renderer or raw JSON. |
 | `Contracts\LlmServiceInterface` | The seam a plugin implements to provide LLM access (`generateResponse()`) and other plugins consume to get one, without depending on a specific provider. |
 | `Events\ToolExecutingEvent` / `Events\ToolExecutedEvent` / `Events\ToolFailedEvent` | The three `tool.*` event VOs (0.5) dispatched around `ToolRegistry::call()` — see [Events](#events-toolexecuting--toolexecuted--toolfailed). |
+| `Inspection\InvocationPlanBuilder` → `Inspection\InvocationPlan` | Builds a read-only, per-tool/channel x-ray of the pipeline from a live `ToolRegistry`, executing nothing — an ordered `list<InvocationStep>` (each tagged by `InvocationStepKind` / `InvocationStepRole` / `StepPresence`) plus `RegistryWiring` (which optional collaborators are actually plugged in). Projected to the CLI by `coa:tools inspect`. |
 
 ## Requirements
 

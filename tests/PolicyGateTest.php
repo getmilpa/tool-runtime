@@ -379,4 +379,57 @@ class PolicyGateTest extends TestCase
         $this->assertFalse($result->allowed);
         $this->assertEquals('blocked by host compliance rule', $result->reason);
     }
+
+    /**
+     * Regression test for the falsy principal bug: a principal with the string id "0"
+     * is a valid authenticated principal and should be authorized on channels requiring auth.
+     *
+     * Previously, `empty($ctx->principal)` incorrectly treated "0" as falsy, denying it
+     * even though it is non-empty and authenticated. The fix replaces empty() with explicit
+     * null/empty-string checks so "0" is correctly recognized as an authenticated principal.
+     */
+    public function testAuthorizePrincipalZeroStringOnWebChannelAllows(): void
+    {
+        // On the web channel (require_auth: true), a principal with the string id "0"
+        // should be recognized as authenticated and authorized.
+        $ctx = ToolContext::web('0', []);  // principal: "0", channel: web, no scopes needed
+        $tool = $this->createTool(scopes: []);  // Tool with no scope requirements
+
+        $result = $this->policyGate->authorize($ctx, $tool);
+
+        $this->assertTrue($result->allowed, 'Principal "0" is valid and should be authorized');
+    }
+
+    /**
+     * Guard test: ensure the fix maintains fail-closed behavior for truly absent principals.
+     * A genuinely anonymous context (principal: null or "") on a channel with require_auth
+     * must be denied.
+     */
+    public function testAuthorizePrincipalNullOnWebChannelDenies(): void
+    {
+        // Principal is explicitly null — genuinely unauthenticated
+        $ctx = new ToolContext(principal: null, channel: 'web');
+        $tool = $this->createTool();
+
+        $result = $this->policyGate->authorize($ctx, $tool);
+
+        $this->assertFalse($result->allowed, 'Null principal must be denied on web channel with require_auth');
+        $this->assertStringContainsString('require_auth', $result->reason);
+    }
+
+    /**
+     * Guard test: ensure the fix maintains fail-closed behavior for empty-string principals.
+     * An empty string principal on a channel with require_auth must be denied.
+     */
+    public function testAuthorizePrincipalEmptyStringOnWebChannelDenies(): void
+    {
+        // Principal is an empty string — genuinely unauthenticated
+        $ctx = new ToolContext(principal: '', channel: 'web');
+        $tool = $this->createTool();
+
+        $result = $this->policyGate->authorize($ctx, $tool);
+
+        $this->assertFalse($result->allowed, 'Empty string principal must be denied on web channel with require_auth');
+        $this->assertStringContainsString('require_auth', $result->reason);
+    }
 }
