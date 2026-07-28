@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.7.0](https://github.com/getmilpa/tool-runtime/compare/v0.6.0...v0.7.0) (2026-07-28)
+
+
+### Features
+
+* attribute local actions to the operator the OS reports ([8b553b1](https://github.com/getmilpa/tool-runtime/commit/8b553b117cee775d590c6256f0396f0eb1379c47))
+* Inspection, y PolicyGate/ToolRegistry al día con la fuente ([c24d75e](https://github.com/getmilpa/tool-runtime/commit/c24d75e0d1260731e101fcbcddbf1593ee6818e0))
+
+
+### Bug Fixes
+
+* el límite de contexto lo gana el prefijo más largo, no el primero (77.8% -&gt; 91.0%) ([91c6bf9](https://github.com/getmilpa/tool-runtime/commit/91c6bf9873f37fc48ca3261f7f253658953857dd))
+
 ## [0.6.0](https://github.com/getmilpa/tool-runtime/compare/v0.5.2...v0.6.0) (2026-07-14)
 
 
