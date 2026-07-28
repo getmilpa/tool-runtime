@@ -37,6 +37,14 @@ final class InvocationPlanBuilder
     {
     }
 
+    /**
+     * Walks every station in inspection order and asks what it would do with this call.
+     *
+     * Nothing is executed and nothing is dispatched: the answer comes from the channel policy, the
+     * tool's own declaration, and what the host actually wired. That is the point — the plan has to
+     * be safe to ask for on a mutating operation, or it would only be usable where it is not
+     * needed.
+     */
     public function build(ToolDefinition $tool, ToolContext $ctx, RegistryWiring $wiring): InvocationPlan
     {
         $policy = $this->policyGate->channelPolicy($ctx->channel);

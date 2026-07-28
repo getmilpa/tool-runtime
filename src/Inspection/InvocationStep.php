@@ -14,6 +14,14 @@ declare(strict_types=1);
 
 namespace Milpa\ToolRuntime\Inspection;
 
+/**
+ * One station of the invocation pipeline, as it stands for this particular call.
+ *
+ * `presence` carries the judgement and the rest carries the consequences: whether it can stop the
+ * call (`blocking`), whether it rewrites the arguments on the way through (`mutates`), and which
+ * step it wraps when it is not a station of its own. `source` names what decided all of that, so a
+ * reader can go argue with the right component rather than with the plan.
+ */
 final readonly class InvocationStep
 {
     public function __construct(
@@ -27,7 +35,11 @@ final readonly class InvocationStep
     ) {
     }
 
-    /** @return array<string, mixed> */
+    /**
+     * Flattens the step, including the wrapped kind when there is one.
+     *
+     * @return array<string, mixed>
+     */
     public function toArray(): array
     {
         return [

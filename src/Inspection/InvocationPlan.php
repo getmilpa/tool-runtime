@@ -14,6 +14,17 @@ declare(strict_types=1);
 
 namespace Milpa\ToolRuntime\Inspection;
 
+/**
+ * What would happen if this tool were invoked with this context — decided without invoking it.
+ *
+ * Answers the question a dry-run cannot: not "did it work" but "which guards stand between the
+ * call and the effect, which of them are live right now, and which are present but dormant". The
+ * plan is the artifact `coa` renders when someone asks why a call was refused, or why one they
+ * expected to be refused went through.
+ *
+ * `schemaVersion` is here because this shape is consumed by tooling outside the process; changing
+ * a field without bumping it breaks a reader that has no way to notice.
+ */
 final readonly class InvocationPlan
 {
     /**
@@ -33,7 +44,14 @@ final readonly class InvocationPlan
     ) {
     }
 
-    /** @return array<string, mixed> */
+    /**
+     * Flattens the plan for whatever is going to render or ship it.
+     *
+     * Enums become their string values here rather than at the edges, so a JSON reader and a
+     * terminal renderer cannot disagree about what a step is called.
+     *
+     * @return array<string, mixed>
+     */
     public function toArray(): array
     {
         return [

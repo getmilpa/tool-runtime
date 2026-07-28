@@ -14,6 +14,13 @@ declare(strict_types=1);
 
 namespace Milpa\ToolRuntime\Inspection;
 
+/**
+ * The stations an invocation can pass through, in the order the pipeline runs them.
+ *
+ * The order is the contract: authorize after validate, because refusing malformed input is not an
+ * authorization decision; clamp between them, because a value has to be inside its bounds before a
+ * policy can be asked about it.
+ */
 enum InvocationStepKind: string
 {
     case Resolve = 'resolve';

@@ -14,6 +14,14 @@ declare(strict_types=1);
 
 namespace Milpa\ToolRuntime\Inspection;
 
+/**
+ * What a station is allowed to do to a call — orthogonal to which station it is.
+ *
+ * A `Guard` may refuse and nothing else; a `Transform` may rewrite arguments and never refuse; a
+ * `Branch` diverts to a different outcome without either. Keeping this apart from
+ * {@see InvocationStepKind} is what lets a reader ask "what can still stop this call" without
+ * knowing every station by name.
+ */
 enum InvocationStepRole: string
 {
     case Guard = 'guard';           // Validate, Authorize — puede short-circuit con un error code
