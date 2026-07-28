@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.8.0](https://github.com/getmilpa/tool-runtime/compare/v0.7.0...v0.8.0) (2026-07-28)
+
+
+### ⚠ BREAKING CHANGES
+
+* consent on the cli channel is a signature that names the call
+
+### Features
+
+* consent on the cli channel is a signature that names the call ([68d9601](https://github.com/getmilpa/tool-runtime/commit/68d9601cbc3a43568f9995f2f5d8fbb0564970c7))
+
 ## [0.7.0](https://github.com/getmilpa/tool-runtime/compare/v0.6.0...v0.7.0) (2026-07-28)
 
 
