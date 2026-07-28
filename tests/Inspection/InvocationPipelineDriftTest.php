@@ -167,11 +167,12 @@ class InvocationPipelineDriftTest extends TestCase
     public function test_rate_limit_precedes_confirm(): void
     {
         // Limiter que deniega + tool confirm:true + ctx autorizado sin token → gana RATE_LIMITED
-        // (rate antes que confirm).
+        // (rate antes que confirm). Por telegram: en `cli` un confirmable sin firma se deniega en
+        // authorize, que va antes que el rate limiter, y la precedencia observada sería otra.
         $this->registry->setRateLimiter($this->denyingRateLimiter());
         $this->register('confirmable', new ToolOptions(requiresConfirmation: true));
 
-        $result = $this->registry->call('confirmable', [], ToolContext::cli());
+        $result = $this->registry->call('confirmable', [], ToolContext::telegram('chat-1'));
 
         self::assertSame(ToolResult::RATE_LIMITED, $result->meta['code'] ?? null);
     }
@@ -181,7 +182,9 @@ class InvocationPipelineDriftTest extends TestCase
         $this->register('planned', new ToolOptions(requiresConfirmation: true));
         $this->seq = [];
 
-        $result = $this->registry->call('planned', [], ToolContext::cli(mode: 'plan'));
+        // Igual que arriba: el confirmable necesita un canal donde el consentimiento siga siendo
+        // un token, o authorize lo detiene antes de que plan-mode pueda demostrar su precedencia.
+        $result = $this->registry->call('planned', [], ToolContext::telegram('chat-1', mode: 'plan'));
 
         self::assertTrue($result->success);
         self::assertNotContains('executing', $this->seq, 'plan-mode retorna ANTES del anchor');
@@ -193,7 +196,10 @@ class InvocationPipelineDriftTest extends TestCase
         $this->register('confirmable2', new ToolOptions(requiresConfirmation: true));
         $this->seq = [];
 
-        $result = $this->registry->call('confirmable2', [], ToolContext::cli()); // sin token
+        // Por telegram, no por cli: en `cli` el consentimiento ahora es una firma, así que un
+        // confirmable sin firmar se deniega en authorize y jamás alcanza el paso de confirmación.
+        // El canal que todavía confirma con token es el que sirve para observar ese paso.
+        $result = $this->registry->call('confirmable2', [], ToolContext::telegram('chat-1')); // sin token
 
         self::assertNotContains('executing', $this->seq, 'confirm retorna ANTES del anchor');
         self::assertSame('confirmation', $result->meta['type'] ?? null);

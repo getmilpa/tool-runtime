@@ -14,7 +14,7 @@ declare(strict_types=1);
 
 namespace Milpa\ToolRuntime\Contracts;
 
-use Milpa\ToolRuntime\Identity\LocalOperator;
+use Milpa\ToolRuntime\Identity\VerifiedSigner;
 
 /**
  * Context for tool execution.
@@ -126,39 +126,53 @@ class ToolContext
     }
 
     /**
-     * Create context for CLI usage (full access).
+     * Create context for a local shell, before anyone has proved who they are.
      *
-     * The principal is the operator the OS reports — not the literal `'cli'` it used to be.
+     * The principal is `local-shell` and that is the honest name for it: not a person, a process
+     * that reached the machine. Scraping the OS for a name was the previous attempt and it was
+     * answering the wrong question — `id -u` reports which account the kernel attached to a
+     * process, which is a fact about the process and not a statement anyone made about an action.
+     * `SUDO_USER` is worse: an environment variable, and one command rewrites it.
      *
-     * This surface delegates authentication to the machine: whoever holds a shell is already
-     * authenticated, and the wildcard scope below follows from that. But "someone with a shell" is
-     * authentication with no identity attached, and it left the most privileged actions in the
-     * system with the weakest line in its audit log — every local administrator collapsed into one
-     * indistinguishable `cli`, on a host where telling them apart is the entire point of auditing.
-     *
-     * {@see LocalOperator} resolves it, and keeps the kernel's answer apart from the environment's
-     * claims: `SUDO_USER` is recorded, never believed. Nothing here changes an authorization
-     * decision — no policy branches on the value of `principal`, only on whether one exists — so
-     * this is strictly a change in what gets written down.
-     *
-     * The asymmetry against {@see web()} is deliberate, not an omission: a remote caller passes a
-     * formal policy gate because the network cannot vouch for it, while a local operator is admitted
-     * by the OS and audited by name. Different doors, different law, both recorded.
+     * Identity on this surface arrives the same way it arrives for a release: somebody signs the
+     * thing. See {@see authorizedBy()}, and the channel policy that stops mutating calls from
+     * running without one.
      *
      * @param string|null $requestId Optional request ID
      * @param string      $mode      Execution mode: 'execute' or 'plan'
      */
     public static function cli(?string $requestId = null, string $mode = 'execute'): self
     {
-        $operator = LocalOperator::fromEnvironment();
-
         return new self(
-            principal: $operator->principal(),
+            principal: 'local-shell',
             channel: 'cli',
             scopes: ['*'],
             request_id: $requestId ?? ToolMeta::generateRequestId(),
-            ip: $operator->originIp(),
-            extra: $operator->attributes(),
+            mode: $mode
+        );
+    }
+
+    /**
+     * Create context for a call a verified signature authorized.
+     *
+     * The principal is the key's fingerprint, so the audit line stops being the system's testimony
+     * about who acted and becomes a record a third party can re-check — against the same key that
+     * verifies this project's releases, fetched over WKD from the domain in its own address.
+     *
+     * `scopes` is deliberately not the wildcard. A signature authorizes the operation it names and
+     * nothing else, so the caller passes that operation's own requirements: the grant is exactly as
+     * wide as what was consented to.
+     *
+     * @param array<string> $scopes the scopes of the operation that was signed for — never `['*']`
+     */
+    public static function authorizedBy(VerifiedSigner $signer, array $scopes, ?string $requestId = null, string $mode = 'execute'): self
+    {
+        return new self(
+            principal: $signer->principal(),
+            channel: 'cli',
+            scopes: $scopes,
+            request_id: $requestId ?? ToolMeta::generateRequestId(),
+            extra: ['signer.fingerprint' => $signer->fingerprint, 'signer.uid' => $signer->uid],
             mode: $mode
         );
     }

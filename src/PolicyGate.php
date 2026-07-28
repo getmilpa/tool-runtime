@@ -64,8 +64,15 @@ class PolicyGate
      * @var array<string, array<string, mixed>>
      */
     private array $channelPolicies = [
+        // Reading is free on a local shell: whoever holds one already reads the database and the
+        // filesystem, so demanding a card touch to list plugins buys nothing and gets switched off.
+        // Mutating is where consent has to be real, and a flag was never that — `--yes` consents to
+        // removal in the abstract, so the same yes covers removing any plugin on any host. A
+        // signature names the target, so it cannot be presented for a different one.
         'cli' => [
-            'allow_all' => true,
+            'allow_all' => false,
+            'block_mutating' => false,
+            'confirmation_requires_signature' => true,
         ],
         'mcp' => [
             'allow_all' => false,  // Security: MCP must validate scopes
@@ -140,6 +147,28 @@ class PolicyGate
             return AuthorizationResult::denied(
                 "channel '{$ctx->channel}' requires an authenticated principal (require_auth) — none provided."
             );
+        }
+
+        // 1b. Where this channel asks for consent, consent means a signature.
+        //
+        // Scoped to what already needed confirming — not to everything that mutates. Widening it
+        // to all mutating calls looked stricter and broke unattended work: a deploy script or a
+        // cron job mutates by design and has no hand to touch a card, so the stricter reading
+        // would have forced someone to turn the gate off entirely. `requiresConfirmation()` is
+        // where this system already decides an act needs a human to say yes; this only changes
+        // what saying yes consists of — a flag anyone at the keyboard can pass, or a signature
+        // that names the target.
+        //
+        // The signal is the fingerprint {@see ToolContext::authorizedBy()} records: it can only be
+        // there because a signature verified, and no other factory writes it. Checking the channel
+        // or the principal string instead would accept anything that spelled itself convincingly.
+        if (($policy['confirmation_requires_signature'] ?? false) && $this->requiresConfirmation($ctx, $tool)) {
+            $fingerprint = $ctx->extra['signer.fingerprint'] ?? null;
+            if (!\is_string($fingerprint) || $fingerprint === '') {
+                return AuthorizationResult::denied(
+                    "'{$tool->name}' needs explicit consent and channel '{$ctx->channel}' takes consent as a signature naming this call — none was presented."
+                );
+            }
         }
 
         // 2. Check if tool requires specific scopes
@@ -249,6 +278,16 @@ class PolicyGate
      */
     public function requiresConfirmation(ToolContext $ctx, ToolDefinition $tool): bool
     {
+        // A verified signature already IS the consent, and a stronger one: the token flow asks
+        // "are you sure" of whoever holds the terminal, while the signature was produced by
+        // whoever holds the key and names this exact call. Asking again afterwards is the double
+        // gate this design forbids — and worse than redundant, since the second question is the
+        // weaker of the two and would be the one a tired operator learns to click through.
+        $fingerprint = $ctx->extra['signer.fingerprint'] ?? null;
+        if (\is_string($fingerprint) && $fingerprint !== '') {
+            return false;
+        }
+
         // Tool explicitly requires confirmation
         if ($tool->requiresConfirmation) {
             return true;

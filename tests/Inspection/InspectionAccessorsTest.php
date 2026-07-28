@@ -43,7 +43,13 @@ class InspectionAccessorsTest extends TestCase
     {
         $gate = new PolicyGate();
         self::assertSame(['allow_all' => false, 'require_auth' => true], $gate->channelPolicy('web'));
-        self::assertSame(['allow_all' => true], $gate->channelPolicy('cli'));
+        // `cli` used to be a blanket allow_all — the local shell trusted for being the local
+        // shell. It now separates reading from mutating: reads pass, mutations need a signature
+        // that names the target.
+        self::assertSame(
+            ['allow_all' => false, 'block_mutating' => false, 'confirmation_requires_signature' => true],
+            $gate->channelPolicy('cli'),
+        );
         // Canal desconocido → fail-closed (UNKNOWN_CHANNEL_POLICY)
         self::assertSame(['require_auth' => true], $gate->channelPolicy('inventado'));
     }
