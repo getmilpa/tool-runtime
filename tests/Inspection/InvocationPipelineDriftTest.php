@@ -97,7 +97,7 @@ class InvocationPipelineDriftTest extends TestCase
      */
     private function denyingRateLimiter(): RateLimiterInterface
     {
-        return new class implements RateLimiterInterface {
+        return new class () implements RateLimiterInterface {
             public function consume(string $key, int $cost = 1, int $windowSeconds = 60, int $maxTokens = 100): RateLimitResult
             {
                 return RateLimitResult::denied('drift-guard: limiter siempre deniega', 60);

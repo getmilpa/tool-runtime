@@ -17,10 +17,10 @@ namespace Milpa\ToolRuntime\Inspection;
 final readonly class InvocationPlan
 {
     /**
-     * @param array{actor: ?string, scopes: list<string>, mode: string} $context
-     * @param list<string>                                               $assumptions
+     * @param array{actor: ?string, scopes: list<string>, mode: string}            $context
+     * @param list<string>                                                         $assumptions
      * @param array{rateLimiter: string, dispatcher: string, ruleProvider: string} $wiring
-     * @param list<InvocationStep>                                       $steps
+     * @param list<InvocationStep>                                                 $steps
      */
     public function __construct(
         public string $schemaVersion,

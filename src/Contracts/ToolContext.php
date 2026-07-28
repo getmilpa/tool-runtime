@@ -14,6 +14,8 @@ declare(strict_types=1);
 
 namespace Milpa\ToolRuntime\Contracts;
 
+use Milpa\ToolRuntime\Identity\LocalOperator;
+
 /**
  * Context for tool execution.
  *
@@ -126,16 +128,37 @@ class ToolContext
     /**
      * Create context for CLI usage (full access).
      *
+     * The principal is the operator the OS reports — not the literal `'cli'` it used to be.
+     *
+     * This surface delegates authentication to the machine: whoever holds a shell is already
+     * authenticated, and the wildcard scope below follows from that. But "someone with a shell" is
+     * authentication with no identity attached, and it left the most privileged actions in the
+     * system with the weakest line in its audit log — every local administrator collapsed into one
+     * indistinguishable `cli`, on a host where telling them apart is the entire point of auditing.
+     *
+     * {@see LocalOperator} resolves it, and keeps the kernel's answer apart from the environment's
+     * claims: `SUDO_USER` is recorded, never believed. Nothing here changes an authorization
+     * decision — no policy branches on the value of `principal`, only on whether one exists — so
+     * this is strictly a change in what gets written down.
+     *
+     * The asymmetry against {@see web()} is deliberate, not an omission: a remote caller passes a
+     * formal policy gate because the network cannot vouch for it, while a local operator is admitted
+     * by the OS and audited by name. Different doors, different law, both recorded.
+     *
      * @param string|null $requestId Optional request ID
      * @param string      $mode      Execution mode: 'execute' or 'plan'
      */
     public static function cli(?string $requestId = null, string $mode = 'execute'): self
     {
+        $operator = LocalOperator::fromEnvironment();
+
         return new self(
-            principal: 'cli',
+            principal: $operator->principal(),
             channel: 'cli',
             scopes: ['*'],
             request_id: $requestId ?? ToolMeta::generateRequestId(),
+            ip: $operator->originIp(),
+            extra: $operator->attributes(),
             mode: $mode
         );
     }

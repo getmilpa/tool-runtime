@@ -110,8 +110,11 @@ final class InvocationPlanBuilderTest extends TestCase
 
     public function test_plan_carries_schema_version_context_and_wiring(): void
     {
-        $plan = $this->builder()->build($this->settingsLikeTool(), ToolContext::web('u', []),
-            new RegistryWiring(false, false, false));
+        $plan = $this->builder()->build(
+            $this->settingsLikeTool(),
+            ToolContext::web('u', []),
+            new RegistryWiring(false, false, false)
+        );
 
         self::assertSame('1.0', $plan->schemaVersion);
         self::assertSame('web', $plan->channel);
@@ -121,8 +124,11 @@ final class InvocationPlanBuilderTest extends TestCase
 
     public function test_cli_channel_shows_authorize_never_blocks_godmode(): void
     {
-        $plan = $this->builder()->build($this->settingsLikeTool(), ToolContext::cli(),
-            new RegistryWiring(false, false, false));
+        $plan = $this->builder()->build(
+            $this->settingsLikeTool(),
+            ToolContext::cli(),
+            new RegistryWiring(false, false, false)
+        );
         $authorize = null;
         foreach ($plan->steps as $s) {
             if ($s->kind === InvocationStepKind::Authorize) {
