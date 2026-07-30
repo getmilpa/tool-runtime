@@ -74,6 +74,14 @@ class PolicyGate
             'block_mutating' => false,
             'confirmation_requires_signature' => true,
         ],
+        // El TUI es la misma terminal que `cli`: misma máquina, misma persona, mismo riesgo. Hereda
+        // su política —leer libre, mutar con firma que nombre la llamada— porque distinguirlos aquí
+        // sería decir que el mismo acto pesa distinto según qué pantalla lo lanzó.
+        'tui' => [
+            'allow_all' => false,
+            'block_mutating' => false,
+            'confirmation_requires_signature' => true,
+        ],
         'mcp' => [
             'allow_all' => false,  // Security: MCP must validate scopes
             'require_auth' => true,

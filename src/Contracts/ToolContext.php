@@ -153,6 +153,26 @@ class ToolContext
     }
 
     /**
+     * El shell TUI: la misma máquina y la misma persona que `cli`, en otra superficie.
+     *
+     * Canal propio y no un alias, por lo que ADR-0035 enseñó: `cli` era a la vez canal y principal
+     * hasta que tool-runtime 0.8 los separó, y mientras decían lo mismo nadie podía distinguir un
+     * cambio de significado de un cambio de nombre. El principal sigue siendo `local-shell` —quien
+     * tiene un shell tiene el TUI— y el canal dice desde DÓNDE se llamó, que es lo que decide cómo se
+     * pide consentimiento y cómo se pinta un resultado.
+     */
+    public static function tui(?string $requestId = null, string $mode = 'execute'): self
+    {
+        return new self(
+            principal: 'local-shell',
+            channel: 'tui',
+            scopes: ['*'],
+            request_id: $requestId ?? ToolMeta::generateRequestId(),
+            mode: $mode
+        );
+    }
+
+    /**
      * Create context for a call a verified signature authorized.
      *
      * The principal is the key's fingerprint, so the audit line stops being the system's testimony
