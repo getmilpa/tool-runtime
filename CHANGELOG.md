@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.1](https://github.com/getmilpa/tool-runtime/compare/v0.9.0...v0.9.1) (2026-08-01)
+
+
+### Bug Fixes
+
+* **deps:** el pin de milpa/core acepta la linea 0.7 ([acd42a9](https://github.com/getmilpa/tool-runtime/commit/acd42a9dd49d7f7b2e2348dd11309b7965ec9cb0))
+
 ## [0.9.0](https://github.com/getmilpa/tool-runtime/compare/v0.8.0...v0.9.0) (2026-07-30)
 
 
