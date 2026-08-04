@@ -11,7 +11,7 @@
     "validation",
     "ai"
   ],
-  "type": "library",
+  "type": "milpa-capability",
   "license": "Apache-2.0",
   "authors": [
     {
@@ -40,6 +40,24 @@
     "psr-4": {
       "Milpa\\ToolRuntime\\Tests\\": "tests/",
       "Milpa\\Docs\\": "vendor/milpa/core/tools/gen-docs/"
+    }
+  },
+  "extra": {
+    "milpa": {
+      "capability": {
+        "id": "tool-runtime",
+        "title": "Governed tool execution: registry, validation, policy and rate limit",
+        "unlocks": [
+          "coa:tools"
+        ],
+        "provides": [
+          "tool.registry"
+        ],
+        "briefing": "The tools this app exposes run through a pipeline that can refuse them.",
+        "contracts": {
+          "tool.registry": "Milpa\\ToolRuntime\\ToolRegistry"
+        }
+      }
     }
   }
 }
