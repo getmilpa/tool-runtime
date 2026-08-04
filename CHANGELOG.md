@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.2](https://github.com/getmilpa/tool-runtime/compare/v0.9.1...v0.9.2) (2026-08-04)
+
+
+### Bug Fixes
+
+* **capability:** declara el contrato de cada id que provee ([68be347](https://github.com/getmilpa/tool-runtime/commit/68be347bd908ca25e8e497006dca113b395c2f64))
+
 ## [0.9.1](https://github.com/getmilpa/tool-runtime/compare/v0.9.0...v0.9.1) (2026-08-01)
 
 
