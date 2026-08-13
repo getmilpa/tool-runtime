@@ -172,7 +172,23 @@ class PolicyGate
         // or the principal string instead would accept anything that spelled itself convincingly.
         if (($policy['confirmation_requires_signature'] ?? false) && $this->requiresConfirmation($ctx, $tool)) {
             $fingerprint = $ctx->extra['signer.fingerprint'] ?? null;
-            if (!\is_string($fingerprint) || $fingerprint === '') {
+
+            // A PERMISSION THE SESSION ALREADY RECORDED IS CONSENT TOO.
+            //
+            // The host asked —«the agent wants to run X, do you authorise it in this session?»—, a
+            // human answered yes, and the grant was written to the session with its acta. This gate
+            // did not look there, so the app asked a question whose answer could not work: measured
+            // end to end in greenhouse evidence/0176, where the config was never written after an
+            // explicit yes. The house was not being strict; it was asking something it could not
+            // honour.
+            //
+            // IT IS WEAKER THAN A SIGNATURE AND THAT IS SAID, NOT HIDDEN: a signature names the
+            // call's arguments and this names only the tool, inside one session. It is the strong
+            // form that remains for everything with no session behind it.
+            $concedidas = $ctx->extra['session.granted'] ?? null;
+            $porLaSesion = \is_array($concedidas) && \in_array($tool->name, $concedidas, true);
+
+            if (! $porLaSesion && (!\is_string($fingerprint) || $fingerprint === '')) {
                 return AuthorizationResult::denied(
                     "'{$tool->name}' needs explicit consent and channel '{$ctx->channel}' takes consent as a signature naming this call — none was presented."
                 );
