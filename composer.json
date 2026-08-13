@@ -1,63 +1,64 @@
 {
-  "name": "milpa/tool-runtime",
-  "description": "AI tool-execution runtime for the Milpa PHP framework: registry pipeline (resolve, validate, authorize, execute, audit), #[Tool] attributes, schema validation, policy gate, rate limiting, channel rendering, and human verification.",
-  "keywords": [
-    "php",
-    "milpa",
-    "framework",
-    "ai-tools",
-    "tool-calling",
-    "registry",
-    "validation",
-    "ai"
-  ],
-  "type": "milpa-capability",
-  "license": "Apache-2.0",
-  "authors": [
-    {
-      "name": "Rodrigo Vicente - TeamX Agency",
-      "homepage": "https://x.com/rodrigoteamx"
-    }
-  ],
-  "require": {
-    "php": ">=8.3",
-    "milpa/core": "^0.6.2 || ^0.7",
-    "psr/log": "^3"
-  },
-  "require-dev": {
-    "phpunit/phpunit": "^11.5",
-    "phpstan/phpstan": "^2.1",
-    "phpstan/phpdoc-parser": "^2.3",
-    "friendsofphp/php-cs-fixer": "^3.65",
-    "milpa/events": "*"
-  },
-  "autoload": {
-    "psr-4": {
-      "Milpa\\ToolRuntime\\": "src/"
-    }
-  },
-  "autoload-dev": {
-    "psr-4": {
-      "Milpa\\ToolRuntime\\Tests\\": "tests/",
-      "Milpa\\Docs\\": "vendor/milpa/core/tools/gen-docs/"
-    }
-  },
-  "extra": {
-    "milpa": {
-      "capability": {
-        "id": "tool-runtime",
-        "title": "Governed tool execution: registry, validation, policy and rate limit",
-        "unlocks": [
-          "coa:tools"
-        ],
-        "provides": [
-          "tool.registry"
-        ],
-        "briefing": "The tools this app exposes run through a pipeline that can refuse them.",
-        "contracts": {
-          "tool.registry": "Milpa\\ToolRuntime\\ToolRegistry"
+    "name": "milpa/tool-runtime",
+    "description": "AI tool-execution runtime for the Milpa PHP framework: registry pipeline (resolve, validate, authorize, execute, audit), #[Tool] attributes, schema validation, policy gate, rate limiting, channel rendering, and human verification.",
+    "keywords": [
+        "php",
+        "milpa",
+        "framework",
+        "ai-tools",
+        "tool-calling",
+        "registry",
+        "validation",
+        "ai"
+    ],
+    "type": "milpa-capability",
+    "license": "Apache-2.0",
+    "authors": [
+        {
+            "name": "Rodrigo Vicente - TeamX Agency",
+            "homepage": "https://x.com/rodrigoteamx"
         }
-      }
+    ],
+    "require": {
+        "php": ">=8.3",
+        "milpa/core": "^0.6.2 || ^0.7",
+        "psr/log": "^3",
+        "milpa/command": "^0.9.1"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^11.5",
+        "phpstan/phpstan": "^2.1",
+        "phpstan/phpdoc-parser": "^2.3",
+        "friendsofphp/php-cs-fixer": "^3.65",
+        "milpa/events": "*"
+    },
+    "autoload": {
+        "psr-4": {
+            "Milpa\\ToolRuntime\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Milpa\\ToolRuntime\\Tests\\": "tests/",
+            "Milpa\\Docs\\": "vendor/milpa/core/tools/gen-docs/"
+        }
+    },
+    "extra": {
+        "milpa": {
+            "capability": {
+                "id": "tool-runtime",
+                "title": "Governed tool execution: registry, validation, policy and rate limit",
+                "unlocks": [
+                    "coa:tools"
+                ],
+                "provides": [
+                    "tool.registry"
+                ],
+                "briefing": "The tools this app exposes run through a pipeline that can refuse them.",
+                "contracts": {
+                    "tool.registry": "Milpa\\ToolRuntime\\ToolRegistry"
+                }
+            }
+        }
     }
-  }
 }

@@ -14,6 +14,7 @@ declare(strict_types=1);
 
 namespace Milpa\ToolRuntime;
 
+use Milpa\Command\Consent\ConsentGrant;
 use Milpa\ToolRuntime\Contracts\ToolContext;
 use Milpa\ToolRuntime\Contracts\PolicyRuleProviderInterface;
 use Milpa\ToolRuntime\Policy\AuthorizationResult;
@@ -185,8 +186,26 @@ class PolicyGate
             // IT IS WEAKER THAN A SIGNATURE AND THAT IS SAID, NOT HIDDEN: a signature names the
             // call's arguments and this names only the tool, inside one session. It is the strong
             // form that remains for everything with no session behind it.
-            $concedidas = $ctx->extra['session.granted'] ?? null;
-            $porLaSesion = \is_array($concedidas) && \in_array($tool->name, $concedidas, true);
+            // EL HECHO, NO SU ORTOGRAFÍA. Antes esto era una lista de cadenas y se comparaba
+            // `in_array($tool->name, …)` — o sea, se comparaba UI. Un permiso escrito `config:set`
+            // no encajaba con una herramienta llamada `config_set`, y el sí del humano no valía
+            // (greenhouse evidence/0176).
+            //
+            // Ahora decide sobre un `ConsentGrant`: un principal respondió una pregunta concreta,
+            // para un acto concreto, bajo un contexto concreto. La identidad la compara el grant por
+            // `OperationId`, y esta compuerta no aprende a deletrear (greenhouse decisions/0030).
+            //
+            // La lista de cadenas se sigue aceptando y está DEPRECADA: quitarla de golpe rompería a
+            // quien ya la manda, y dejarla sin decirlo la volvería el contrato de facto.
+            $grant = $ctx->extra['consent.grant'] ?? null;
+            $porLaSesion = $grant instanceof ConsentGrant
+                && $grant->covers($tool->name, $ctx->extra['consent.arguments'] ?? []);
+
+            if (! $porLaSesion) {
+                /** @deprecated desde v0.10.0 — manda un ConsentGrant */
+                $concedidas = $ctx->extra['session.granted'] ?? null;
+                $porLaSesion = \is_array($concedidas) && \in_array($tool->name, $concedidas, true);
+            }
 
             if (! $porLaSesion && (!\is_string($fingerprint) || $fingerprint === '')) {
                 return AuthorizationResult::denied(
