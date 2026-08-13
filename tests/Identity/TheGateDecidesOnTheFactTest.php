@@ -105,6 +105,29 @@ final class TheGateDecidesOnTheFactTest extends TestCase
         self::assertFalse($no->allowed);
     }
 
+    /**
+     * 6 · a session can hold more than one yes, and neither one erases the other.
+     *
+     * Accepting a single grant forced the host to overwrite the context per permission, so with two
+     * authorisations one was lost in silence — the quiet kind of loss this house refuses.
+     */
+    public function testASessionCanHoldMoreThanOneYes(): void
+    {
+        $cli = ToolContext::cli();
+        $ctx = new ToolContext(
+            principal: $cli->principal,
+            channel: $cli->channel,
+            scopes: $cli->scopes,
+            extra: ['consent.grants' => [$this->grant('config.set'), $this->grant('plugins.register')]],
+        );
+
+        $gate = new PolicyGate();
+
+        self::assertTrue($gate->authorize($ctx, $this->herramienta('config_set'))->allowed);
+        self::assertTrue($gate->authorize($ctx, $this->herramienta('plugins_register'))->allowed);
+        self::assertFalse($gate->authorize($ctx, $this->herramienta('foundation_found'))->allowed);
+    }
+
     /** @param array<string, mixed> $argumentos */
     private function cliCon(ConsentGrant $grant, array $argumentos = []): ToolContext
     {

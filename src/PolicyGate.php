@@ -197,9 +197,24 @@ class PolicyGate
             //
             // La lista de cadenas se sigue aceptando y está DEPRECADA: quitarla de golpe rompería a
             // quien ya la manda, y dejarla sin decirlo la volvería el contrato de facto.
-            $grant = $ctx->extra['consent.grant'] ?? null;
-            $porLaSesion = $grant instanceof ConsentGrant
-                && $grant->covers($tool->name, $ctx->extra['consent.arguments'] ?? []);
+            // UNA SESIÓN PUEDE TENER MÁS DE UN SÍ. Aceptar un solo grant obligaba al host a pisar
+            // el contexto en cada permiso y sólo el último sobrevivía: con dos autorizaciones, una
+            // se perdía en silencio. Se acepta la lista, y `consent.grant` singular se sigue
+            // aceptando porque ya se publicó.
+            $argumentos = $ctx->extra['consent.arguments'] ?? [];
+            $grants = $ctx->extra['consent.grants'] ?? [];
+            if (($uno = $ctx->extra['consent.grant'] ?? null) instanceof ConsentGrant) {
+                $grants[] = $uno;
+            }
+
+            $porLaSesion = false;
+            foreach (\is_array($grants) ? $grants : [] as $g) {
+                if ($g instanceof ConsentGrant && $g->covers($tool->name, $argumentos)) {
+                    $porLaSesion = true;
+
+                    break;
+                }
+            }
 
             if (! $porLaSesion) {
                 /** @deprecated desde v0.10.0 — manda un ConsentGrant */
