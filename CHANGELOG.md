@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.10.0](https://github.com/getmilpa/tool-runtime/compare/v0.9.2...v0.10.0) (2026-08-13)
+
+
+### Features
+
+* a permission the session already recorded is consent too ([#16](https://github.com/getmilpa/tool-runtime/issues/16)) ([05770e0](https://github.com/getmilpa/tool-runtime/commit/05770e025cb0f15822d4d82732f3b969617785a3))
+* the gate decides on the fact, and never learns to spell ([#19](https://github.com/getmilpa/tool-runtime/issues/19)) ([ff3bc1b](https://github.com/getmilpa/tool-runtime/commit/ff3bc1bafc1bf16c5b63c027134bf3803c8ca44f))
+
+
+### Bug Fixes
+
+* a session can hold more than one yes ([#20](https://github.com/getmilpa/tool-runtime/issues/20)) ([9725e34](https://github.com/getmilpa/tool-runtime/commit/9725e34591cd49e52099eb812f37bae5434bbee8))
+
 ## [0.9.2](https://github.com/getmilpa/tool-runtime/compare/v0.9.1...v0.9.2) (2026-08-04)
 
 
