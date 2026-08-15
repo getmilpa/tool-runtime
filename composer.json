@@ -23,7 +23,7 @@
         "php": ">=8.3",
         "milpa/core": ">=0.6.2 <1.0",
         "psr/log": "^3",
-        "milpa/command": "^0.9.1"
+        "milpa/command": ">=0.9.1 <1.0"
     },
     "require-dev": {
         "phpunit/phpunit": "^11.5",
