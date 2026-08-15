@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.0](https://github.com/getmilpa/tool-runtime/compare/v0.10.1...v0.11.0) (2026-08-15)
+
+
+### Features
+
+* the protocol can say whether a payload ASKED or DID ([#26](https://github.com/getmilpa/tool-runtime/issues/26)) ([5a5e772](https://github.com/getmilpa/tool-runtime/commit/5a5e772a8f1f1c147ca2dc23b07005f7dfafe3c3))
+
 ## [0.9.2](https://github.com/getmilpa/tool-runtime/compare/v0.9.1...v0.9.2) (2026-08-04)
 
 
