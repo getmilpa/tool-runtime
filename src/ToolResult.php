@@ -178,7 +178,48 @@ class ToolResult implements \JsonSerializable
      */
     public function requiresConfirmation(): bool
     {
-        return ($this->meta['requires_confirmation'] ?? false) === true;
+        return self::asksForConfirmation($this->toArray());
+    }
+
+    /**
+     * Whether a payload that already travelled is a call ASKING rather than a call that DID.
+     *
+     * ── WHY A STATIC ON TOP OF THE INSTANCE PREDICATE ───────────────────────────────────────────
+     *
+     * A confirmation request and a completed write both come back successful, so a consumer holding
+     * only the serialized result cannot separate «it asked for a token» from «it wrote». A session
+     * log that cannot separate them counts two mutations where there was one — and that is the count
+     * that governs consent (greenhouse `evidence/0200`).
+     *
+     * Downstream holds a string, not an object, and the rule lives here because this package owns the
+     * protocol. A second reader of `requires_confirmation` elsewhere disagrees with this one the day
+     * either changes.
+     *
+     * ── THE FLAG IS NOT READ WHEREVER IT APPEARS ────────────────────────────────────────────────
+     *
+     * A plan-mode result carries `requires_confirmation` inside its plan: it says what WOULD need
+     * confirming, it is not itself asking. Matching the key at any depth would record a plan as a
+     * pending mutation, which is the opposite of what a plan is.
+     *
+     * @param mixed $payload The serialized result, decoded or as JSON: the full envelope, where the
+     *                       flag rides under `meta`, or the data payload that reaches a model, where
+     *                       it rides at the top.
+     */
+    public static function asksForConfirmation(mixed $payload): bool
+    {
+        if (\is_string($payload)) {
+            $payload = json_decode($payload, true);
+        }
+        if (!\is_array($payload)) {
+            return false;
+        }
+
+        $meta = $payload['meta'] ?? null;
+        if (\is_array($meta) && ($meta['requires_confirmation'] ?? false) === true) {
+            return true;
+        }
+
+        return ($payload['requires_confirmation'] ?? false) === true;
     }
 
     /**
