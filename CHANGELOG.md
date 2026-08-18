@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.0](https://github.com/getmilpa/tool-runtime/compare/v0.11.0...v0.12.0) (2026-08-18)
+
+
+### Features
+
+* the granted verdict travels to the run instead of dying at the banner ([#29](https://github.com/getmilpa/tool-runtime/issues/29)) ([eba03a7](https://github.com/getmilpa/tool-runtime/commit/eba03a708b888d92b6598f1f04d537eb664fde92))
+
 ## [0.9.2](https://github.com/getmilpa/tool-runtime/compare/v0.9.1...v0.9.2) (2026-08-04)
 
 
