@@ -15,10 +15,17 @@ declare(strict_types=1);
 namespace Milpa\ToolRuntime\RateLimiting;
 
 /**
- * In-memory rate limiter using sliding window algorithm.
+ * In-memory rate limiter using a sliding window.
  *
- * Note: This implementation is per-process. For production with multiple
- * workers, use RedisRateLimiter instead.
+ * PER-PROCESS, and that is the whole caveat: several workers each keep their own buckets, so a limit of
+ * ten is ten PER WORKER. Whoever needs one shared count implements {@see RateLimiterInterface} over a
+ * store they run.
+ *
+ * This docblock used to end «use RedisRateLimiter instead». **There is no RedisRateLimiter** — not in this
+ * package, not anywhere in the framework. Advice pointing at a class nobody wrote reads as a shipped
+ * alternative and costs a reader the search before they find out (greenhouse decisions/0213 row 7,
+ * decisions/0215 F5). Naming the contract instead is the honest version: the seam is real, the
+ * implementation is yours.
  */
 class InMemoryRateLimiter implements RateLimiterInterface
 {
