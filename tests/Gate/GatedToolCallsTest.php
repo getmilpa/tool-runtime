@@ -160,8 +160,10 @@ final class GatedToolCallsTest extends TestCase
         $calls->callTool('zero', []);
         $calls->callTool('bad', []);
 
-        // `null` as JSON, `0` as JSON, the unencodable as the empty string — never `NULL`, never `Array`.
-        self::assertSame(['null', '0', ''], $told);
+        // `null` as JSON; `0` as the EMPTY string (the gateway's `?:` always swallowed a falsy «0», and a recorder
+        // that read that shape for years keeps reading it); the unencodable as the empty string — never `NULL`,
+        // never `Array`.
+        self::assertSame(['null', '', ''], $told);
         self::assertNull(json_decode($told[0], true, 512, \JSON_THROW_ON_ERROR));
     }
 
