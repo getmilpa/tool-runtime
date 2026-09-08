@@ -17,6 +17,7 @@ namespace Milpa\ToolRuntime\Events;
 use Milpa\Events\VerificationGrantedEvent;
 use Milpa\Events\VerificationRejectedEvent;
 use Milpa\Events\VerificationRequestedEvent;
+use Milpa\Interfaces\Event\DeclaresEvents;
 use Milpa\Interfaces\Event\EventDeclaration;
 use Milpa\ToolRuntime\ToolRegistry;
 use Milpa\ToolRuntime\Verification\HumanVerifier;
@@ -31,9 +32,13 @@ use Milpa\ToolRuntime\Verification\HumanVerifier;
  * moment it receives one ({@see self::forRegistry()} from the registry's constructor,
  * {@see self::forVerifier()} from the verifier's); a dispatcher that does not implement it is
  * asked nothing, and dispatching keeps working whether or not anything was declared.
- * {@see self::declarations()} is the package-wide list, the shape a catalogue prints.
+ * {@see self::declarations()} is the package-wide list, the shape a catalogue prints — and,
+ * because this class implements {@see DeclaresEvents} and `composer.json` names it under
+ * `extra.milpa.events`, a host can read that list straight from the installed manifest and
+ * declare it on behalf of emitters the running process will never construct (a CLI run builds
+ * no {@see ToolRegistry}).
  */
-final class ToolRuntimeEvents
+final class ToolRuntimeEvents implements DeclaresEvents
 {
     /**
      * PRE, interceptable: fires inside {@see ToolRegistry::call()} once resolve, validate/clamp,
@@ -71,6 +76,8 @@ final class ToolRuntimeEvents
 
     /**
      * One declaration per event name this package dispatches: the registry's, then the verifier's.
+     *
+     * Built from the same constants the dispatch sites use, so a rename moves both at once.
      *
      * @return list<EventDeclaration>
      */
