@@ -170,10 +170,8 @@ final class GatedToolCallsTest extends TestCase
     public function testTheContextTravelsToTheRegistry(): void
     {
         $calls = new GatedToolCalls($this->registry());
-        self::assertNull($calls->getContext());
         $context = new ToolContext(channel: 'cli');
         $calls->setContext($context);
-        self::assertSame($context, $calls->getContext());
         self::assertSame(['said' => 'x'], $calls->callTool('echo', ['text' => 'x']));
     }
 }

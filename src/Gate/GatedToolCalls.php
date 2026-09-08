@@ -44,12 +44,6 @@ class GatedToolCalls
         $this->context = $context;
     }
 
-    /** The context in force, or `null` when none was set. */
-    public function getContext(): ?ToolContext
-    {
-        return $this->context;
-    }
-
     /**
      * The registry's tool summaries, minus what {@see self::hidden()} takes away.
      *
