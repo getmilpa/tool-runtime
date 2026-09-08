@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.13.0](https://github.com/getmilpa/tool-runtime/compare/v0.12.0...v0.13.0) (2026-09-08)
+
+
+### Features
+
+* the gate lives here — ToolCallGate, ToolCallRecorder, ToolCallRefused and GatedToolCalls ([#33](https://github.com/getmilpa/tool-runtime/issues/33)) ([3837671](https://github.com/getmilpa/tool-runtime/commit/38376716fcaa809c03c0ff046a28c54cd922dbfe))
+
 ## [0.12.0](https://github.com/getmilpa/tool-runtime/compare/v0.11.0...v0.12.0) (2026-08-18)
 
 
