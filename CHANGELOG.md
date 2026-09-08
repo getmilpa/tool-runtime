@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.13.1](https://github.com/getmilpa/tool-runtime/compare/v0.13.0...v0.13.1) (2026-09-08)
+
+
+### Bug Fixes
+
+* what a gated call records keeps the shape the model gateway always recorded ([#35](https://github.com/getmilpa/tool-runtime/issues/35)) ([5e09fcf](https://github.com/getmilpa/tool-runtime/commit/5e09fcfdc7808b682178f71f04cb07553f5aa32c))
+
 ## [0.13.0](https://github.com/getmilpa/tool-runtime/compare/v0.12.0...v0.13.0) (2026-09-08)
 
 
