@@ -17,8 +17,10 @@ namespace Milpa\ToolRuntime\Verification;
 use Milpa\Events\VerificationGrantedEvent;
 use Milpa\Events\VerificationRejectedEvent;
 use Milpa\Events\VerificationRequestedEvent;
+use Milpa\Interfaces\Event\DeclaredEvents;
 use Milpa\Interfaces\Event\MilpaEventDispatcherInterface;
 use Milpa\Interfaces\Verification\VerifierInterface;
+use Milpa\ToolRuntime\Events\ToolRuntimeEvents;
 use Milpa\ValueObjects\Verification\VerificationContext;
 use Milpa\ValueObjects\Verification\VerificationRequest;
 use Milpa\ValueObjects\Verification\VerificationResult;
@@ -39,8 +41,17 @@ final class HumanVerifier implements VerifierInterface
     /** Identifies this verifier implementation in {@see \Milpa\ValueObjects\Verification\VerificationResult::$verifier}. */
     public const NAME = 'human_verifier';
 
+    /**
+     * @param MilpaEventDispatcherInterface|null $dispatcher Optional event dispatcher; `null` announces nothing. The
+     *                                                       three `verification.*` events are declared to it here, where
+     *                                                       it enters the package (greenhouse decisions/0228), when it
+     *                                                       implements {@see DeclaredEvents} — otherwise it is asked nothing.
+     */
     public function __construct(private readonly ?MilpaEventDispatcherInterface $dispatcher = null)
     {
+        if ($dispatcher instanceof DeclaredEvents) {
+            $dispatcher->declare(...ToolRuntimeEvents::forVerifier());
+        }
     }
 
     /**
@@ -51,7 +62,7 @@ final class HumanVerifier implements VerifierInterface
      */
     public function verify(VerificationRequest $request, VerificationContext $context): VerificationResult
     {
-        $this->dispatcher?->dispatch('verification.requested', ['event' => new VerificationRequestedEvent($request)]);
+        $this->dispatcher?->dispatch(ToolRuntimeEvents::VERIFICATION_REQUESTED, ['event' => new VerificationRequestedEvent($request)]);
 
         return VerificationResult::pending(verifier: self::NAME);
     }
@@ -66,7 +77,7 @@ final class HumanVerifier implements VerifierInterface
             principal: $principal,
             metadata: $reason !== null ? ['reason' => $reason] : [],
         );
-        $this->dispatcher?->dispatch('verification.granted', ['event' => new VerificationGrantedEvent($request, $result)]);
+        $this->dispatcher?->dispatch(ToolRuntimeEvents::VERIFICATION_GRANTED, ['event' => new VerificationGrantedEvent($request, $result)]);
 
         return $result;
     }
@@ -77,7 +88,7 @@ final class HumanVerifier implements VerifierInterface
     public function reject(VerificationRequest $request, string $principal, string $reason): VerificationResult
     {
         $result = VerificationResult::fail($reason, verifier: self::NAME, principal: $principal);
-        $this->dispatcher?->dispatch('verification.rejected', ['event' => new VerificationRejectedEvent($request, $result)]);
+        $this->dispatcher?->dispatch(ToolRuntimeEvents::VERIFICATION_REJECTED, ['event' => new VerificationRejectedEvent($request, $result)]);
 
         return $result;
     }
