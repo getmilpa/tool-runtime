@@ -15,11 +15,13 @@ declare(strict_types=1);
 namespace Milpa\ToolRuntime;
 
 use Milpa\Events\InterceptionSlot;
+use Milpa\Interfaces\Event\DeclaredEvents;
 use Milpa\Interfaces\Event\MilpaEventDispatcherInterface;
 use Milpa\ToolRuntime\Contracts\ToolContext;
 use Milpa\ToolRuntime\Events\ToolExecutedEvent;
 use Milpa\ToolRuntime\Events\ToolExecutingEvent;
 use Milpa\ToolRuntime\Events\ToolFailedEvent;
+use Milpa\ToolRuntime\Events\ToolRuntimeEvents;
 use Psr\Log\LoggerInterface;
 use Milpa\Interfaces\Tooling\ToolRegistryInterface;
 use Milpa\ValueObjects\Tooling\ToolOptions;
@@ -75,14 +77,20 @@ class ToolRegistry implements ToolRegistryInterface
     {
         $this->logger = $logger;
         $this->dispatcher = $dispatcher;
+
+        // The events this registry dispatches, declared where the dispatcher enters the package
+        // (greenhouse decisions/0228). A dispatcher that cannot hold declarations is asked nothing.
+        if ($dispatcher instanceof DeclaredEvents) {
+            $dispatcher->declare(...ToolRuntimeEvents::forRegistry());
+        }
         $this->validator = new SchemaValidator();
         $this->policyGate = new PolicyGate();
         $this->confirmationStore = new ConfirmationTokenStore();
         $this->auditLogger = new ToolAuditLogger($logger);
         $this->tokenEstimator = new TokenEstimator();
 
-        $this->dispatcher?->subscribe('tool.executed', $this->auditLogger->onToolExecuted(...));
-        $this->dispatcher?->subscribe('tool.failed', $this->auditLogger->onToolFailed(...));
+        $this->dispatcher?->subscribe(ToolRuntimeEvents::TOOL_EXECUTED, $this->auditLogger->onToolExecuted(...));
+        $this->dispatcher?->subscribe(ToolRuntimeEvents::TOOL_FAILED, $this->auditLogger->onToolFailed(...));
     }
 
     /**
@@ -487,7 +495,7 @@ class ToolRegistry implements ToolRegistryInterface
         // docs/superpowers/specs/2026-07-08-event-driven-familia-design.md §tool-runtime 0.5.
         $slot = new InterceptionSlot();
         $this->dispatcher?->dispatch(
-            'tool.executing',
+            ToolRuntimeEvents::TOOL_EXECUTING,
             ['event' => new ToolExecutingEvent($name, $ctx, $args), 'slot' => $slot]
         );
 
@@ -582,11 +590,11 @@ class ToolRegistry implements ToolRegistryInterface
     private function emitExecuted(ToolExecutedEvent $event): void
     {
         if ($this->dispatcher !== null) {
-            $this->dispatcher->dispatch('tool.executed', ['event' => $event]);
+            $this->dispatcher->dispatch(ToolRuntimeEvents::TOOL_EXECUTED, ['event' => $event]);
             return;
         }
 
-        $this->auditLogger->onToolExecuted('tool.executed', ['event' => $event]);
+        $this->auditLogger->onToolExecuted(ToolRuntimeEvents::TOOL_EXECUTED, ['event' => $event]);
     }
 
     /**
@@ -595,11 +603,11 @@ class ToolRegistry implements ToolRegistryInterface
     private function emitFailed(ToolFailedEvent $event): void
     {
         if ($this->dispatcher !== null) {
-            $this->dispatcher->dispatch('tool.failed', ['event' => $event]);
+            $this->dispatcher->dispatch(ToolRuntimeEvents::TOOL_FAILED, ['event' => $event]);
             return;
         }
 
-        $this->auditLogger->onToolFailed('tool.failed', ['event' => $event]);
+        $this->auditLogger->onToolFailed(ToolRuntimeEvents::TOOL_FAILED, ['event' => $event]);
     }
 
     /**

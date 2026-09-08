@@ -240,6 +240,23 @@ With a dispatcher wired, three events fire around every call:
 | `tool.executed` | **POST** — a call finished, live or via a cache short-circuit | `Events\ToolExecutedEvent($name, $ctx, $args, $result, $cacheServed)` | No — readonly notification |
 | `tool.failed` | **POST** — the tool's own callback threw | `Events\ToolFailedEvent($name, $ctx, $args, $exception, $tookMs)` | No — readonly notification |
 
+### The events declare themselves
+
+Since 0.14 (greenhouse decisions/0228), the names above are constants on
+`Events\ToolRuntimeEvents` (`TOOL_EXECUTING`, `TOOL_EXECUTED`, `TOOL_FAILED`, and the three
+`VERIFICATION_*` below) — the dispatch sites and the declarations read the SAME constant, so a
+rename cannot drift between what fires and what is declared. Where the dispatcher enters the
+package — the `ToolRegistry` and `HumanVerifier` constructors — each emitter declares its own
+events to any dispatcher implementing `Milpa\Interfaces\Event\DeclaredEvents` (`milpa/core`
+≥ 0.11; the `milpa/events` dispatcher does since 0.4): an `EventDeclaration` per name with who
+dispatches it, when, the payload key (`event`), the subject class, and whether a slot travels with
+it. A dispatcher that does not implement `DeclaredEvents` is asked nothing, and `dispatch()` keeps
+working whether or not anything was declared — declaring is counted, not enforced.
+`ToolRuntimeEvents::declarations()` is the package-wide list (`forRegistry()` / `forVerifier()`
+per emitter), the shape a catalogue such as `events:catalogue` prints. The falsifier is
+`tests/TheEmitterDeclaresEveryEventItDispatchesTest.php`: a spy dispatcher drives both real code
+paths and every dispatched name must have been declared with the subject it really carried.
+
 ### The security anchor
 
 `tool.executing` is dispatched from exactly one place inside `ToolRegistry::call()`: *after*
@@ -529,12 +546,13 @@ The types you construct and pass around day to day:
 | `Rendering\RendererRegistry` | Picks a `ChannelRendererInterface` for a `ToolResult` based on `ToolContext::$channel`, falling back to a default renderer or raw JSON. |
 | `Contracts\LlmServiceInterface` | The seam a plugin implements to provide LLM access (`generateResponse()`) and other plugins consume to get one, without depending on a specific provider. |
 | `Events\ToolExecutingEvent` / `Events\ToolExecutedEvent` / `Events\ToolFailedEvent` | The three `tool.*` event VOs (0.5) dispatched around `ToolRegistry::call()` — see [Events](#events-toolexecuting--toolexecuted--toolfailed). |
+| `Events\ToolRuntimeEvents` | The event-name constants and the `EventDeclaration`s of every event this package dispatches (0.14) — see [The events declare themselves](#the-events-declare-themselves). |
 | `Inspection\InvocationPlanBuilder` → `Inspection\InvocationPlan` | Builds a read-only, per-tool/channel x-ray of the pipeline from a live `ToolRegistry`, executing nothing — an ordered `list<InvocationStep>` (each tagged by `InvocationStepKind` / `InvocationStepRole` / `StepPresence`) plus `RegistryWiring` (which optional collaborators are actually plugged in). Projected to the CLI by `coa:tools inspect`. |
 
 ## Requirements
 
 - PHP **≥ 8.3**
-- [`milpa/core`](https://packagist.org/packages/milpa/core) **^0.6** (the `InterceptionSlot` / `MilpaEventDispatcherInterface` keystone the [Events](#events-toolexecuting--toolexecuted--toolfailed) seam is built on)
+- [`milpa/core`](https://packagist.org/packages/milpa/core) **>=0.11 <1.0** (the `InterceptionSlot` / `MilpaEventDispatcherInterface` keystone the [Events](#events-toolexecuting--toolexecuted--toolfailed) seam is built on, and the `EventDeclaration` / `DeclaredEvents` contract the events declare themselves through)
 - [`psr/log`](https://packagist.org/packages/psr/log) **^3**
 - [`milpa/events`](https://packagist.org/packages/milpa/events) *(optional, dev-only)* — the reference `MilpaEventDispatcherInterface` implementation; any conformant implementation works, this package has no hard dependency on it
 
