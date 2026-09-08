@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.15.0](https://github.com/getmilpa/tool-runtime/compare/v0.14.0...v0.15.0) (2026-09-08)
+
+
+### Features
+
+* the manifest names the holder, so a process that never builds an emitter still knows its events ([#40](https://github.com/getmilpa/tool-runtime/issues/40)) ([beba641](https://github.com/getmilpa/tool-runtime/commit/beba641120d0143bd5c2bd0bcfeaec2901b898ee))
+
 ## [0.14.0](https://github.com/getmilpa/tool-runtime/compare/v0.13.1...v0.14.0) (2026-09-08)
 
 
