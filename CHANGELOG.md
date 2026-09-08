@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.14.0](https://github.com/getmilpa/tool-runtime/compare/v0.13.1...v0.14.0) (2026-09-08)
+
+
+### Features
+
+* the events declare themselves — every tool.* and verification.* name is declared to the dispatcher ([#38](https://github.com/getmilpa/tool-runtime/issues/38)) ([39edbf0](https://github.com/getmilpa/tool-runtime/commit/39edbf0cbf63811d3d724b2cd7231324a6e8b468))
+
 ## [0.13.1](https://github.com/getmilpa/tool-runtime/compare/v0.13.0...v0.13.1) (2026-09-08)
 
 
