@@ -115,16 +115,19 @@ class GatedToolCalls
         return false;
     }
 
-    /** What a tool returned, as text — an array is kept as JSON, not as «Array». */
+    /**
+     * What a tool returned, as text — a string as is, anything else as JSON, never as «Array».
+     *
+     * Byte-for-byte what the model gateway recorded before the move (greenhouse decisions/0225): `null` is
+     * `null`, `0` is `0`, and what JSON cannot encode is the empty string — a recorder that read one shape
+     * for years must not be handed another because the class changed package.
+     */
     protected function rendered(mixed $data): string
     {
         if (\is_string($data)) {
             return $data;
         }
-        if (\is_scalar($data) || $data === null) {
-            return var_export($data, true);
-        }
 
-        return json_encode($data, \JSON_UNESCAPED_UNICODE | \JSON_UNESCAPED_SLASHES) ?: 'Array';
+        return json_encode($data, \JSON_UNESCAPED_UNICODE | \JSON_UNESCAPED_SLASHES) ?: '';
     }
 }

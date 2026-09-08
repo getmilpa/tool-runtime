@@ -137,6 +137,36 @@ final class GatedToolCallsTest extends TestCase
         }
     }
 
+    public function testWhatIsRecordedKeepsTheShapeTheModelGatewayAlwaysRecorded(): void
+    {
+        $registry = new ToolRegistry(new NullLogger());
+        $registry->register('null', 'Returns null', ['type' => 'object'], static fn (array $a): ToolResult => new ToolResult(true, null));
+        $registry->register('zero', 'Returns 0', ['type' => 'object'], static fn (array $a): ToolResult => new ToolResult(true, 0));
+        $registry->register('bad', 'Returns what JSON cannot encode', ['type' => 'object'], static fn (array $a): ToolResult => new ToolResult(true, ['k' => "\xB1"]));
+        $told = [];
+        $recorder = new class ($told) implements ToolCallRecorder {
+            /** @param list<string> $told */
+            public function __construct(private array &$told)
+            {
+            }
+
+            public function recorded(string $tool, array $arguments, string $result, bool $ok): void
+            {
+                $this->told[] = $result;
+            }
+        };
+        $calls = new GatedToolCalls($registry, null, $recorder);
+        $calls->callTool('null', []);
+        $calls->callTool('zero', []);
+        $calls->callTool('bad', []);
+
+        // `null` as JSON; `0` as the EMPTY string (the gateway's `?:` always swallowed a falsy «0», and a recorder
+        // that read that shape for years keeps reading it); the unencodable as the empty string — never `NULL`,
+        // never `Array`.
+        self::assertSame(['null', '', ''], $told);
+        self::assertNull(json_decode($told[0], true, 512, \JSON_THROW_ON_ERROR));
+    }
+
     public function testTheContextTravelsToTheRegistry(): void
     {
         $calls = new GatedToolCalls($this->registry());
