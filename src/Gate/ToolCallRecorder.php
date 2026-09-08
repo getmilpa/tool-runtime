@@ -24,6 +24,8 @@ namespace Milpa\ToolRuntime\Gate;
 interface ToolCallRecorder
 {
     /**
+     * Told once per call: the tool, its arguments, the rendered result and whether it succeeded.
+     *
      * @param array<string, mixed> $arguments
      */
     public function recorded(string $tool, array $arguments, string $result, bool $ok): void;
