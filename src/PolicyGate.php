@@ -49,6 +49,8 @@ class PolicyGate
      */
     private ?PolicyRuleProviderInterface $ruleProvider = null;
 
+    private ?\Milpa\ToolRuntime\Contracts\CallPolicy $callPolicy = null;
+
     /**
      * @param LoggerInterface $logger sink for the learnable warning emitted when an unregistered
      *                                channel falls back to the fail-closed policy — defaults to a
@@ -137,13 +139,18 @@ class PolicyGate
     /**
      * Authorize a tool call.
      *
-     * @param ToolContext    $ctx  The execution context
-     * @param ToolDefinition $tool The tool being called
+     * @param ToolContext          $ctx       The execution context
+     * @param ToolDefinition       $tool      The tool being called
+     * @param array<string, mixed> $arguments the validated and clamped call input
      *
      * @return AuthorizationResult
      */
-    public function authorize(ToolContext $ctx, ToolDefinition $tool): AuthorizationResult
+    public function authorize(ToolContext $ctx, ToolDefinition $tool, array $arguments = []): AuthorizationResult
     {
+        $call = $this->authorizeCall($ctx, $tool, $arguments);
+        if (!$call->allowed) {
+            return $call;
+        }
         if (!isset($this->channelPolicies[$ctx->channel])) {
             $this->warnUnknownChannel($ctx->channel);
         }
@@ -230,13 +237,9 @@ class PolicyGate
         }
 
         // 2. Check if tool requires specific scopes
-        if (!empty($tool->scopes)) {
-            if (!$ctx->hasAnyScope($tool->scopes)) {
-                return AuthorizationResult::denied(
-                    "Missing required scope for tool '{$tool->name}'. Need one of: " . implode(', ', $tool->scopes)
-                        . ' — context has: ' . (empty($ctx->scopes) ? '(none)' : implode(', ', $ctx->scopes)) . '.'
-                );
-            }
+        $scopeVerdict = $this->authorizeScopes($ctx, $tool->name, $tool->scopes);
+        if (!$scopeVerdict->allowed) {
+            return $scopeVerdict;
         }
 
         // 3. Check DB rules if repository available
@@ -254,6 +257,53 @@ class PolicyGate
         }
 
         return AuthorizationResult::allowed();
+    }
+
+    /**
+     * Judge declared scope requirements before a surface asks for call-specific consent.
+     *
+     * This is the scope check used by authorize(), exposed so the CLI and the governed door
+     * ask the same question (greenhouse decisions/0314). Admission here does not grant consent
+     * or bypass channel/database policy. The full authorization must still run before execution.
+     *
+     * @param array<string> $scopes any declared alternative admits the call; none requires nothing
+     */
+    public function authorizeScopes(ToolContext $ctx, string $name, array $scopes): AuthorizationResult
+    {
+        if ($scopes !== [] && !$ctx->hasAnyScope($scopes)) {
+            return AuthorizationResult::denied(
+                "Missing required scope for tool '{$name}'. Need one of: " . implode(', ', $scopes)
+                    . ' — context has: ' . ($ctx->scopes === [] ? '(none)' : implode(', ', $ctx->scopes)) . '.'
+            );
+        }
+
+        return AuthorizationResult::allowed();
+    }
+
+    /** Install the host's restrictions; they can only narrow declared scope admission. */
+    public function setCallPolicy(\Milpa\ToolRuntime\Contracts\CallPolicy $policy): void
+    {
+        $this->callPolicy = $policy;
+    }
+
+    /** The same host policy is available to a confined executor. */
+    public function getCallPolicy(): ?\Milpa\ToolRuntime\Contracts\CallPolicy
+    {
+        return $this->callPolicy;
+    }
+
+    /**
+     * Judge authority before consent; the full channel/database policy still runs at execution.
+     *
+     * @param array<string, mixed> $arguments
+     */
+    public function authorizeCall(ToolContext $ctx, ToolDefinition $tool, array $arguments): AuthorizationResult
+    {
+        $scope = $this->authorizeScopes($ctx, $tool->name, $tool->scopes);
+        if (!$scope->allowed) {
+            return $scope;
+        }
+        return $this->callPolicy?->authorize($ctx, $tool, $arguments) ?? AuthorizationResult::allowed();
     }
 
     /**
