@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.17.0](https://github.com/getmilpa/tool-runtime/compare/v0.15.0...v0.17.0) (2026-09-12)
+
+
+### Features
+
+* **policy:** judge concrete calls before consent ([3a24399](https://github.com/getmilpa/tool-runtime/commit/3a24399465a4ebfdbadffa566a80fe8867e57d92))
+
 ## [0.15.0](https://github.com/getmilpa/tool-runtime/compare/v0.14.0...v0.15.0) (2026-09-08)
 
 
