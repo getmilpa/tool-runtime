@@ -73,6 +73,25 @@ class GatedToolCalls
      */
     public function callTool(string $name, array $args): mixed
     {
+        // Scope is authority, not consent. An out-of-scope call must not open a session
+        // question whose answer cannot authorize it (greenhouse decisions/0314).
+        // Unknown tools retain the existing resolution/gate path; no contract is invented.
+        $definition = $this->registry->getDefinition($name);
+        if ($definition !== null) {
+            $scope = $this->registry->getPolicyGate()->authorizeCall(
+                $this->context ?? ToolContext::cli(),
+                $definition,
+                $args,
+            );
+            if (!$scope->allowed) {
+                $error = (string) $scope->reason;
+                $this->recorder?->recorded($name, $args, $error, false);
+
+                // Preserve the registry's scope-failure shape; this is not a session pause.
+                throw new \Exception($error);
+            }
+        }
+
         if ($this->gate !== null) {
             $reason = $this->gate->refuse($name, $args);
             if ($reason !== null) {

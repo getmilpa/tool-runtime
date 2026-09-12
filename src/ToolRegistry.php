@@ -393,7 +393,7 @@ class ToolRegistry implements ToolRegistryInterface
         $this->logger->debug("[ToolRegistry] Tool scopes required: " . implode(', ', $tool->scopes ?: ['(none)']));
         $this->logger->debug("[ToolRegistry] Context scopes: " . implode(', ', $ctx->scopes ?: ['(none)']));
 
-        $authResult = $this->policyGate->authorize($ctx, $tool);
+        $authResult = $this->policyGate->authorize($ctx, $tool, $args);
         $this->logger->debug("[ToolRegistry] Auth result: " . ($authResult->allowed ? 'ALLOWED' : 'DENIED: ' . ($authResult->reason ?? 'unknown')));
 
         if (!$authResult->allowed) {
@@ -526,12 +526,16 @@ class ToolRegistry implements ToolRegistryInterface
         // 6. Execute
         try {
             // Inject context into args for tools that need it
-            $args['_ctx'] = $ctx;
+            if (!$tool->callback instanceof \Milpa\ToolRuntime\Contracts\ContextualToolHandler) {
+                $args['_ctx'] = $ctx;
+            }
 
             // Track execution time for soft timeout enforcement
             $execStartTime = microtime(true);
 
-            $result = call_user_func($tool->callback, $args);
+            $result = $tool->callback instanceof \Milpa\ToolRuntime\Contracts\ContextualToolHandler
+                ? ($tool->callback)($args, $ctx)
+                : call_user_func($tool->callback, $args);
 
             $executionTime = microtime(true) - $execStartTime;
             $timeoutSeconds = $tool->timeout;

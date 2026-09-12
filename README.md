@@ -173,6 +173,19 @@ denial names the rule id, the tool, and the channel; a rate-limit denial names t
 `ToolResult::FORBIDDEN` (or `ToolResult::RATE_LIMITED`) either way — callers that match on the
 code are unaffected; only the message got specific enough to debug from the error alone.
 
+`PolicyGate::authorizeScopes($context, $name, $scopes)` exposes only the declared-scope check.
+Any one required scope is sufficient; the exact `*` context scope admits all, and an empty required
+list adds no restriction at this layer. `PolicyGate::authorizeCall($context, $definition, $arguments)`
+adds an optional host `Contracts\CallPolicy` after that scope check. Install it with `setCallPolicy()`:
+it can restrict a concrete resource, but cannot override a missing static scope. `GatedToolCalls`
+uses this combined judgment before the session gate, so a missing scope or resource grant cannot
+open a consent question. The registry still runs full authorization, including channel and resource
+rules. A successful preflight alone never authorizes execution.
+
+Handlers implementing `Contracts\ContextualToolHandler` receive the validated arguments and the
+explicit `ToolContext` as separate arguments. Legacy callbacks still receive one array containing
+`_ctx`; opting into the interface avoids mixing authority into operation input.
+
 **Trusted local stdio MCP servers**: a no-auth `mcp` transport (an editor or agent runtime
 spawning your server as a child process, with no separate per-caller identity to authenticate)
 should build its `ToolContext` with `ToolContext::stdio($requestId)` — it hard-codes
