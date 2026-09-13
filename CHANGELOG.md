@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.17.1](https://github.com/getmilpa/tool-runtime/compare/v0.17.0...v0.17.1) (2026-09-13)
+
+
+### Bug Fixes
+
+* enforce active withdrawal before tool execution ([fb3f515](https://github.com/getmilpa/tool-runtime/commit/fb3f515bec8b67a33122bb0bf9cab71b25f95ced))
+* refuse active withdrawals before the tool gate and handler ([c365aaa](https://github.com/getmilpa/tool-runtime/commit/c365aaa12c0671ea433256e8a3e40029a546dbb5))
+
 ## [0.17.0](https://github.com/getmilpa/tool-runtime/compare/v0.15.0...v0.17.0) (2026-09-12)
 
 
