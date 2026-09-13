@@ -116,7 +116,7 @@ final class ActiveWithdrawalTest extends TestCase
         } catch (ToolCallRefused) {
         }
         $state->withdrawn = [];
-        self::assertSame(['marked' => true],$door->callTool('mark',[]));
-        self::assertSame(2,$state->handled);
+        self::assertSame(['marked' => true], $door->callTool('mark', []));
+        self::assertSame(2, $state->handled);
     }
 }
