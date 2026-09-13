@@ -22,9 +22,9 @@ use Milpa\ToolRuntime\ToolRegistry;
  *
  * This is the one place a tool is called on behalf of an actor that must be governed — a model, a recipe, a
  * sequence. Every caller extends it or holds one: a model gateway adds what it removed from the table, a
- * governed door adds the consent it collected (greenhouse decisions/0225). Two hooks are all an extension
- * needs: {@see self::hidden()} for names that leave the catalogue, {@see self::optionRemoved()} for a
- * refusal that names an option already taken away. Nothing here knows what a session or a model is.
+ * governed door adds the consent it collected (greenhouse decisions/0225). Extensions separate three facts:
+ * {@see self::hidden()} controls catalogue visibility, {@see self::withdrawn()} forbids execution, and
+ * {@see self::optionRemoved()} marks a gate refusal against historical withdrawal. Nothing here knows what a session or a model is.
  */
 class GatedToolCalls
 {
@@ -64,11 +64,11 @@ class GatedToolCalls
     }
 
     /**
-     * Call one tool: the gate first, then the registry, then the recorder.
+     * Call one tool: scopes, active withdrawal, gate, registry, then recorder.
      *
      * @param array<string, mixed> $args
      *
-     * @throws ToolCallRefused when the gate refuses — never handed back as a tool error
+     * @throws ToolCallRefused when an active withdrawal or the gate refuses
      * @throws \Exception      when the tool itself failed, with the tool's own error
      */
     public function callTool(string $name, array $args): mixed
@@ -90,6 +90,15 @@ class GatedToolCalls
                 // Preserve the registry's scope-failure shape; this is not a session pause.
                 throw new \Exception($error);
             }
+        }
+
+        // Visibility can be temporary and history can be record-only. Only the current
+        // withdrawal projection forbids execution (greenhouse decisions/0362).
+        if (\in_array($name, $this->withdrawn(), true)) {
+            $reason = "Tool '{$name}' has been withdrawn from this session.";
+            $this->recorder?->recorded($name, $args, $reason, false);
+
+            throw new ToolCallRefused($reason, optionRemoved: true);
         }
 
         if ($this->gate !== null) {
@@ -118,6 +127,16 @@ class GatedToolCalls
      * @return list<string>
      */
     protected function hidden(): array
+    {
+        return [];
+    }
+
+    /**
+     * Names currently forbidden from execution, independent of visibility and removal history.
+     *
+     * @return list<string>
+     */
+    protected function withdrawn(): array
     {
         return [];
     }
