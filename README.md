@@ -587,3 +587,19 @@ issues via [SECURITY.md](SECURITY.md), and note that this project follows a
 ---
 
 Milpa is designed, built, and maintained by **[Rodrigo Vicente - TeamX Agency](https://teamx.agency/?utm_source=github&utm_medium=readme&utm_campaign=milpa&utm_content=tool-runtime)**.
+
+## Per-call result budgets
+
+A transport can provide a delivery constraint without replacing the verified caller:
+
+```php
+use Milpa\ToolRuntime\Contracts\ResultBudget;
+
+$result = $calls->callToolWithBudget('source_page', ['path' => 'src/App.php'], ResultBudget::json(6144));
+```
+
+A `ContextualToolHandler` reads `$context->resultBudget`. `fits($result)` measures the entire encoded result in UTF-8 characters; `encode($result)` uses the same encoder. `tightenedTo($limit)` can reduce the allowance, never increase it. JSON preserves Unicode and escapes slashes. File byte offsets and token windows use different units.
+
+`callToolWithBudget()` dispatches the existing `callTool()` override, then applies the constraint to the caller context supplied by that override. Scopes, gate refusals, active withdrawals, plan mode and recording still apply. A `finally` restores the previous budget after success or failure, including nested synchronous calls. Share neither an execution context nor this mutable call facade between concurrent requests. `ToolContext::withResultBudget()` copies identity, scopes, correlation and mode; budget is not an authority grant and is omitted from `toArray()`.
+
+The producer remains responsible for fitting its result. This contract does not truncate automatically. Existing calls and handlers may ignore the optional budget.
