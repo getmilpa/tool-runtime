@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.18.0](https://github.com/getmilpa/tool-runtime/compare/v0.17.1...v0.18.0) (2026-09-16)
+
+
+### Features
+
+* carry result budgets through governed tool calls ([16b28dd](https://github.com/getmilpa/tool-runtime/commit/16b28dd0aed63fafbf19f2697f5102a8b1189128))
+* carry result budgets through governed tool calls ([9166860](https://github.com/getmilpa/tool-runtime/commit/91668609d208b5d98eda21737d44b8c3cb511a92))
+
 ## [0.17.1](https://github.com/getmilpa/tool-runtime/compare/v0.17.0...v0.17.1) (2026-09-13)
 
 
