@@ -15,6 +15,7 @@ declare(strict_types=1);
 namespace Milpa\ToolRuntime\Gate;
 
 use Milpa\ToolRuntime\Contracts\ToolContext;
+use Milpa\ToolRuntime\Contracts\ResultBudget;
 use Milpa\ToolRuntime\ToolRegistry;
 
 /**
@@ -30,6 +31,8 @@ class GatedToolCalls
 {
     private ?ToolContext $context = null;
 
+    private ?ResultBudget $resultBudget = null;
+
     /** Calls through `$registry`, asking `$gate` before each one and telling `$recorder` after — both optional. */
     public function __construct(
         private readonly ToolRegistry $registry,
@@ -42,6 +45,23 @@ class GatedToolCalls
     public function setContext(ToolContext $context): void
     {
         $this->context = $context;
+    }
+
+    /**
+     * Scope a transport budget to one synchronous call, preserving subclass dispatch and gates.
+     * The overlay is applied after an extension has supplied the actual caller's context.
+     *
+     * @param array<string, mixed> $args
+     */
+    final public function callToolWithBudget(string $name, array $args, ResultBudget $budget): mixed
+    {
+        $previous = $this->resultBudget;
+        $this->resultBudget = $budget;
+        try {
+            return $this->callTool($name, $args);
+        } finally {
+            $this->resultBudget = $previous;
+        }
     }
 
     /**
@@ -73,13 +93,17 @@ class GatedToolCalls
      */
     public function callTool(string $name, array $args): mixed
     {
+        $context = $this->context;
+        if ($this->resultBudget !== null) {
+            $context = ($context ?? ToolContext::cli())->withResultBudget($this->resultBudget);
+        }
         // Scope is authority, not consent. An out-of-scope call must not open a session
         // question whose answer cannot authorize it (greenhouse decisions/0314).
         // Unknown tools retain the existing resolution/gate path; no contract is invented.
         $definition = $this->registry->getDefinition($name);
         if ($definition !== null) {
             $scope = $this->registry->getPolicyGate()->authorizeCall(
-                $this->context ?? ToolContext::cli(),
+                $context ?? ToolContext::cli(),
                 $definition,
                 $args,
             );
@@ -108,7 +132,7 @@ class GatedToolCalls
             }
         }
 
-        $result = $this->registry->call($name, $args, $this->context);
+        $result = $this->registry->call($name, $args, $context);
         if ($result->success) {
             $this->recorder?->recorded($name, $args, $this->rendered($result->data), true);
 

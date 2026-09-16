@@ -42,7 +42,8 @@ class ToolContext
         public readonly ?string $ip = null,
         public readonly ?string $userAgent = null,
         public readonly array $extra = [],            // additional context data
-        string $mode = 'execute'                      // 'execute' | 'plan'
+        string $mode = 'execute',                     // 'execute' | 'plan'
+        public readonly ?ResultBudget $resultBudget = null,
     ) {
         // Auto-generate request ID if not provided
         $this->request_id = $request_id ?? ToolMeta::generateRequestId();
@@ -64,6 +65,23 @@ class ToolContext
             userAgent: $this->userAgent,
             extra: $this->extra,
             mode: 'plan',
+            resultBudget: $this->resultBudget,
+        );
+    }
+
+    /** Add delivery constraints without replacing identity, authority, correlation or mode. */
+    public function withResultBudget(?ResultBudget $budget): self
+    {
+        return new self(
+            principal: $this->principal,
+            channel: $this->channel,
+            scopes: $this->scopes,
+            request_id: $this->request_id,
+            ip: $this->ip,
+            userAgent: $this->userAgent,
+            extra: $this->extra,
+            mode: $this->mode,
+            resultBudget: $budget,
         );
     }
 
