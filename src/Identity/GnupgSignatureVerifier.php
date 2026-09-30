@@ -27,20 +27,49 @@ namespace Milpa\ToolRuntime\Identity;
  * signature" would silently accept every signature in a Spanish locale by finding nothing to
  * object to. `--status-fd` emits `GOODSIG` and `VALIDSIG` in every language.
  */
-final class GnupgSignatureVerifier implements SignatureVerifier
+final class GnupgSignatureVerifier implements SignatureVerifier, ExplainsRefusal
 {
     public function __construct(private readonly string $gpgBinary = 'gpg')
     {
     }
 
     /**
-     * Hands both halves to gpg on disk and reads its machine-readable verdict.
+     * Hands both halves to gpg and reads its machine-readable verdict: the signer, or nobody.
+     */
+    public function verify(string $payload, string $signature): ?VerifiedSigner
+    {
+        $status = $this->status($payload, $signature);
+
+        return $status === null ? null : $this->readStatus($status);
+    }
+
+    /**
+     * Why this signature establishes nobody, or null when it does (greenhouse evidence/1071, B9).
+     *
+     * Asked only after {@see verify()} refused, so gpg runs a second time on the refusal path alone. It
+     * reads the same status stream and never returns a signer: the gate's answer is already «no».
+     */
+    public function whyNot(string $payload, string $signature): ?SignatureRefusal
+    {
+        $status = $this->status($payload, $signature);
+        if ($status === null) {
+            return new SignatureRefusal(SignatureRefusal::UNREADABLE);
+        }
+        if ($this->readStatus($status) !== null) {
+            return null;
+        }
+
+        return $this->readRefusal($status);
+    }
+
+    /**
+     * Hands both halves to gpg on disk and returns its status stream, or null when gpg gave none.
      *
      * Temporary files rather than stdin because a detached signature needs two inputs, and both are
      * removed whatever happens — the payload names an operation and its arguments, so leaving it
      * behind would leak what an operator was about to do.
      */
-    public function verify(string $payload, string $signature): ?VerifiedSigner
+    private function status(string $payload, string $signature): ?string
     {
         $payloadFile = tempnam(sys_get_temp_dir(), 'milpa-op-');
         $signatureFile = tempnam(sys_get_temp_dir(), 'milpa-sig-');
@@ -62,7 +91,7 @@ final class GnupgSignatureVerifier implements SignatureVerifier
                 return null;
             }
 
-            return $this->readStatus($output);
+            return $output;
         } finally {
             @unlink($payloadFile);
             @unlink($signatureFile);
@@ -92,5 +121,43 @@ final class GnupgSignatureVerifier implements SignatureVerifier
             fingerprint: $valid[1],
             uid: $uid !== '' ? $uid : null,
         );
+    }
+
+    /**
+     * Names the refusal from the status stream. A missing key first: gpg prints ERRSIG with return code 9
+     * (and, since 2.2, the full fingerprint as its last field) next to NO_PUBKEY with the short id.
+     */
+    private function readRefusal(string $status): SignatureRefusal
+    {
+        if (preg_match('/^\[GNUPG:\] ERRSIG (\S+) \S+ \S+ \S+ \S+ 9(?: ([0-9A-F]{40}))?/m', $status, $errsig)) {
+            return new SignatureRefusal(SignatureRefusal::MISSING_KEY, ($errsig[2] ?? '') !== '' ? $errsig[2] : $errsig[1], self::keyring());
+        }
+        if (preg_match('/^\[GNUPG:\] NO_PUBKEY (\S+)/m', $status, $missing)) {
+            return new SignatureRefusal(SignatureRefusal::MISSING_KEY, $missing[1], self::keyring());
+        }
+        foreach ([
+            'BADSIG' => SignatureRefusal::ALTERED,
+            'EXPKEYSIG' => SignatureRefusal::KEY_EXPIRED,
+            'REVKEYSIG' => SignatureRefusal::KEY_REVOKED,
+            'EXPSIG' => SignatureRefusal::SIGNATURE_EXPIRED,
+        ] as $line => $reason) {
+            if (preg_match('/^\[GNUPG:\] ' . $line . ' (\S+)/m', $status, $named)) {
+                return new SignatureRefusal($reason, $named[1]);
+            }
+        }
+
+        return new SignatureRefusal(SignatureRefusal::UNREADABLE);
+    }
+
+    /** The keyring gpg read: `GNUPGHOME` when set, otherwise gpg's own default under the home directory. */
+    private static function keyring(): string
+    {
+        $home = getenv('GNUPGHOME');
+        if (\is_string($home) && $home !== '') {
+            return $home;
+        }
+        $user = getenv('HOME');
+
+        return (\is_string($user) && $user !== '' ? rtrim($user, '/') : '~') . '/.gnupg';
     }
 }

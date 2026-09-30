@@ -15,6 +15,7 @@ declare(strict_types=1);
 namespace Milpa\ToolRuntime\Tests\Identity;
 
 use Milpa\ToolRuntime\Identity\GnupgSignatureVerifier;
+use Milpa\ToolRuntime\Identity\SignatureRefusal;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 
@@ -28,6 +29,7 @@ use PHPUnit\Framework\TestCase;
  * accepting on "no objection found" is how a check becomes decorative in exactly one locale.
  */
 #[CoversClass(GnupgSignatureVerifier::class)]
+#[CoversClass(SignatureRefusal::class)]
 final class GnupgSignatureVerifierTest extends TestCase
 {
     /** @var list<string> */
@@ -128,5 +130,104 @@ final class GnupgSignatureVerifierTest extends TestCase
 
         $after = (array) glob(sys_get_temp_dir() . '/milpa-{op,sig}-*', \GLOB_BRACE);
         self::assertSame(\count($before), \count($after));
+    }
+    /*
+     * ── WHY NOT: the refusal named, never a signer (greenhouse evidence/1071 B9) ────────────────────────
+     *
+     * A receipt signed by a key that is simply not in the keyring was reported as «altered, or the key
+     * expired or was revoked». The statuses below are what gpg 2.4.9 printed for each case (evidence/1077).
+     */
+
+    public function test_a_key_missing_from_the_keyring_is_named_with_its_fingerprint(): void
+    {
+        $gpg = $this->gpgPrinting(
+            "[GNUPG:] NEWSIG\n"
+            . "[GNUPG:] ERRSIG DA8D8D3D7BFE43D3 22 10 00 1790745392 9 B386992484B357EFE18FCA25DA8D8D3D7BFE43D3\n"
+            . "[GNUPG:] NO_PUBKEY DA8D8D3D7BFE43D3\n"
+            . '[GNUPG:] FAILURE gpg-exit 33554433'
+        );
+
+        $refusal = (new GnupgSignatureVerifier($gpg))->whyNot('payload', 'signature');
+
+        self::assertSame(SignatureRefusal::MISSING_KEY, $refusal?->reason);
+        self::assertSame('B386992484B357EFE18FCA25DA8D8D3D7BFE43D3', $refusal?->key);
+        self::assertStringContainsString('is not in the keyring this terminal reads', $refusal?->sentence() ?? '');
+        self::assertStringNotContainsString('altered', $refusal?->sentence() ?? '');
+        self::assertStringContainsString('GNUPGHOME', $refusal?->remedy() ?? '');
+    }
+
+    public function test_an_older_gpg_that_only_says_no_pubkey_is_named_by_its_short_id(): void
+    {
+        $gpg = $this->gpgPrinting('[GNUPG:] NO_PUBKEY 7D72DEBDA1D36D34');
+
+        $refusal = (new GnupgSignatureVerifier($gpg))->whyNot('payload', 'signature');
+
+        self::assertSame(SignatureRefusal::MISSING_KEY, $refusal?->reason);
+        self::assertSame('7D72DEBDA1D36D34', $refusal?->key);
+    }
+
+    public function test_a_bad_signature_is_named_altered(): void
+    {
+        $gpg = $this->gpgPrinting("[GNUPG:] BADSIG DA8D8D3D7BFE43D3 resident\n[GNUPG:] FAILURE gpg-exit 33554433");
+
+        $refusal = (new GnupgSignatureVerifier($gpg))->whyNot('payload', 'signature');
+
+        self::assertSame(SignatureRefusal::ALTERED, $refusal?->reason);
+        self::assertStringContainsString('altered', $refusal?->sentence() ?? '');
+        self::assertStringContainsString('--sign', $refusal?->remedy() ?? '');
+    }
+
+    public function test_an_expired_or_revoked_key_is_named_as_such(): void
+    {
+        $expired = $this->gpgPrinting('[GNUPG:] EXPKEYSIG DA8D8D3D7BFE43D3 resident');
+        $revoked = $this->gpgPrinting('[GNUPG:] REVKEYSIG DA8D8D3D7BFE43D3 resident');
+        $old = $this->gpgPrinting('[GNUPG:] EXPSIG DA8D8D3D7BFE43D3 resident');
+
+        self::assertSame(SignatureRefusal::KEY_EXPIRED, (new GnupgSignatureVerifier($expired))->whyNot('p', 's')?->reason);
+        self::assertSame(SignatureRefusal::KEY_REVOKED, (new GnupgSignatureVerifier($revoked))->whyNot('p', 's')?->reason);
+        self::assertSame(SignatureRefusal::SIGNATURE_EXPIRED, (new GnupgSignatureVerifier($old))->whyNot('p', 's')?->reason);
+        self::assertStringContainsString('expired', (new GnupgSignatureVerifier($expired))->whyNot('p', 's')?->sentence() ?? '');
+        self::assertStringContainsString('revoked', (new GnupgSignatureVerifier($revoked))->whyNot('p', 's')?->sentence() ?? '');
+    }
+
+    public function test_a_status_it_cannot_read_is_said_as_unreadable_not_as_a_cause(): void
+    {
+        $gpg = $this->gpgPrinting('gpg: Firma correcta de "Rodrigo Vicente <rodrigo@teamx.agency>"');
+
+        self::assertSame(SignatureRefusal::UNREADABLE, (new GnupgSignatureVerifier($gpg))->whyNot('p', 's')?->reason);
+        self::assertSame(SignatureRefusal::UNREADABLE, (new GnupgSignatureVerifier('/nonexistent/gpg'))->whyNot('p', 's')?->reason);
+    }
+
+    public function test_a_signature_that_verifies_has_no_refusal(): void
+    {
+        $gpg = $this->gpgPrinting(
+            "[GNUPG:] GOODSIG 7D72DEBDA1D36D34 Rodrigo Vicente <rodrigo@teamx.agency>\n"
+            . '[GNUPG:] VALIDSIG BE7554E982E2CA5A0213B6067D72DEBDA1D36D34 2026-07-28 1785000000'
+        );
+
+        self::assertNull((new GnupgSignatureVerifier($gpg))->whyNot('payload', 'signature'));
+    }
+
+    public function test_the_refusal_never_establishes_a_signer(): void
+    {
+        // The port's rule stands (SignatureVerifier): verify() says null for every refusal. whyNot() only
+        // puts words to it; a missing key must not become a softer «no» a caller could proceed on.
+        $gpg = $this->gpgPrinting("[GNUPG:] ERRSIG DA8D8D3D7BFE43D3 22 10 00 1790745392 9 B386992484B357EFE18FCA25DA8D8D3D7BFE43D3\n[GNUPG:] NO_PUBKEY DA8D8D3D7BFE43D3");
+
+        self::assertNull((new GnupgSignatureVerifier($gpg))->verify('payload', 'signature'));
+    }
+
+    public function test_the_missing_key_sentence_names_the_keyring_it_read(): void
+    {
+        $refusal = new SignatureRefusal(SignatureRefusal::MISSING_KEY, 'B386992484B357EFE18FCA25DA8D8D3D7BFE43D3', '/home/rod/.gnupg');
+
+        self::assertSame(
+            'the key that signed it (B386992484B357EFE18FCA25DA8D8D3D7BFE43D3) is not in the keyring this terminal reads (/home/rod/.gnupg)',
+            $refusal->sentence(),
+        );
+        self::assertSame(
+            'Run it again with GNUPGHOME set to the keyring of the key that signed it — for a resident, the resident\'s own keyring.',
+            $refusal->remedy(),
+        );
     }
 }
