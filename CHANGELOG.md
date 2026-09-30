@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.19.0](https://github.com/getmilpa/tool-runtime/compare/v0.18.0...v0.19.0) (2026-09-30)
+
+
+### Features
+
+* **identity:** name why a signature established nobody ([#48](https://github.com/getmilpa/tool-runtime/issues/48)) ([b93612c](https://github.com/getmilpa/tool-runtime/commit/b93612c25f61b4e16a45d533e32f32b00f44bb42))
+
 ## [0.18.0](https://github.com/getmilpa/tool-runtime/compare/v0.17.1...v0.18.0) (2026-09-16)
 
 
