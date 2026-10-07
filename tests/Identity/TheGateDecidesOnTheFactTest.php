@@ -90,7 +90,7 @@ final class TheGateDecidesOnTheFactTest extends TestCase
     {
         $grant = new ConsentGrant(
             operation: new OperationId('config.set'),
-            principal: 'cli:rod@cm4070',
+            principal: 'cli:operator@workstation',
             session: 'ses-A',
             grantedAt: new \DateTimeImmutable('2026-08-13 10:00:00'),
             provenance: 'session.question_answered',
@@ -147,7 +147,7 @@ final class TheGateDecidesOnTheFactTest extends TestCase
     {
         return new ConsentGrant(
             operation: new OperationId($operacion),
-            principal: 'cli:rod@cm4070',
+            principal: 'cli:operator@workstation',
             session: 'ses-A',
             grantedAt: new \DateTimeImmutable('2026-08-13 10:00:00'),
             provenance: 'session.question_answered',

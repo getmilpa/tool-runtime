@@ -58,28 +58,28 @@ final class GnupgSignatureVerifierTest extends TestCase
     public function test_a_good_signature_yields_the_full_fingerprint(): void
     {
         $gpg = $this->gpgPrinting(
-            "[GNUPG:] GOODSIG 7D72DEBDA1D36D34 Rodrigo Vicente (TeamX Admin) <rodrigo@teamx.agency>\n" .
-            '[GNUPG:] VALIDSIG BE7554E982E2CA5A0213B6067D72DEBDA1D36D34 2026-07-28 1785000000'
+            "[GNUPG:] GOODSIG DDDD4444EEEE5555 Rodrigo Vicente (TeamX Admin) <rodrigo@teamx.agency>\n" .
+            '[GNUPG:] VALIDSIG AAAA1111BBBB2222CCCC3333DDDD4444EEEE5555 2026-07-28 1785000000'
         );
 
         $signer = (new GnupgSignatureVerifier($gpg))->verify('payload', 'signature');
 
         // The short id from GOODSIG is not unique; VALIDSIG carries the whole fingerprint, and an
         // audit record keyed on the short one can be collided with on purpose.
-        self::assertSame('BE7554E982E2CA5A0213B6067D72DEBDA1D36D34', $signer?->fingerprint);
+        self::assertSame('AAAA1111BBBB2222CCCC3333DDDD4444EEEE5555', $signer?->fingerprint);
         self::assertSame('Rodrigo Vicente (TeamX Admin) <rodrigo@teamx.agency>', $signer?->uid);
     }
 
     public function test_a_bad_signature_establishes_nobody(): void
     {
-        $gpg = $this->gpgPrinting('[GNUPG:] BADSIG 7D72DEBDA1D36D34 Rodrigo Vicente <rodrigo@teamx.agency>');
+        $gpg = $this->gpgPrinting('[GNUPG:] BADSIG DDDD4444EEEE5555 Rodrigo Vicente <rodrigo@teamx.agency>');
 
         self::assertNull((new GnupgSignatureVerifier($gpg))->verify('payload', 'signature'));
     }
 
     public function test_an_unknown_key_establishes_nobody(): void
     {
-        $gpg = $this->gpgPrinting("[GNUPG:] NO_PUBKEY 7D72DEBDA1D36D34\n[GNUPG:] ERRSIG 7D72DEBDA1D36D34 1 8 00 1785000000 9");
+        $gpg = $this->gpgPrinting("[GNUPG:] NO_PUBKEY DDDD4444EEEE5555\n[GNUPG:] ERRSIG DDDD4444EEEE5555 1 8 00 1785000000 9");
 
         self::assertNull((new GnupgSignatureVerifier($gpg))->verify('payload', 'signature'));
     }
@@ -88,7 +88,7 @@ final class GnupgSignatureVerifierTest extends TestCase
     {
         // GOODSIG without VALIDSIG: gpg could parse it and could not fully validate it. Half a
         // verdict is not a verdict.
-        $gpg = $this->gpgPrinting('[GNUPG:] GOODSIG 7D72DEBDA1D36D34 Rodrigo Vicente <rodrigo@teamx.agency>');
+        $gpg = $this->gpgPrinting('[GNUPG:] GOODSIG DDDD4444EEEE5555 Rodrigo Vicente <rodrigo@teamx.agency>');
 
         self::assertNull((new GnupgSignatureVerifier($gpg))->verify('payload', 'signature'));
     }
@@ -107,7 +107,7 @@ final class GnupgSignatureVerifierTest extends TestCase
         // VALIDSIG without GOODSIG: the cryptography checked out and gpg named nobody. Both lines
         // are required because each answers half the question, and half an answer here would put
         // an empty actor in an audit record.
-        $gpg = $this->gpgPrinting('[GNUPG:] VALIDSIG BE7554E982E2CA5A0213B6067D72DEBDA1D36D34 2026-07-28 1785000000');
+        $gpg = $this->gpgPrinting('[GNUPG:] VALIDSIG AAAA1111BBBB2222CCCC3333DDDD4444EEEE5555 2026-07-28 1785000000');
 
         self::assertNull((new GnupgSignatureVerifier($gpg))->verify('payload', 'signature'));
     }
@@ -158,12 +158,12 @@ final class GnupgSignatureVerifierTest extends TestCase
 
     public function test_an_older_gpg_that_only_says_no_pubkey_is_named_by_its_short_id(): void
     {
-        $gpg = $this->gpgPrinting('[GNUPG:] NO_PUBKEY 7D72DEBDA1D36D34');
+        $gpg = $this->gpgPrinting('[GNUPG:] NO_PUBKEY DDDD4444EEEE5555');
 
         $refusal = (new GnupgSignatureVerifier($gpg))->whyNot('payload', 'signature');
 
         self::assertSame(SignatureRefusal::MISSING_KEY, $refusal?->reason);
-        self::assertSame('7D72DEBDA1D36D34', $refusal?->key);
+        self::assertSame('DDDD4444EEEE5555', $refusal?->key);
     }
 
     public function test_a_bad_signature_is_named_altered(): void
@@ -201,8 +201,8 @@ final class GnupgSignatureVerifierTest extends TestCase
     public function test_a_signature_that_verifies_has_no_refusal(): void
     {
         $gpg = $this->gpgPrinting(
-            "[GNUPG:] GOODSIG 7D72DEBDA1D36D34 Rodrigo Vicente <rodrigo@teamx.agency>\n"
-            . '[GNUPG:] VALIDSIG BE7554E982E2CA5A0213B6067D72DEBDA1D36D34 2026-07-28 1785000000'
+            "[GNUPG:] GOODSIG DDDD4444EEEE5555 Rodrigo Vicente <rodrigo@teamx.agency>\n"
+            . '[GNUPG:] VALIDSIG AAAA1111BBBB2222CCCC3333DDDD4444EEEE5555 2026-07-28 1785000000'
         );
 
         self::assertNull((new GnupgSignatureVerifier($gpg))->whyNot('payload', 'signature'));
@@ -219,10 +219,10 @@ final class GnupgSignatureVerifierTest extends TestCase
 
     public function test_the_missing_key_sentence_names_the_keyring_it_read(): void
     {
-        $refusal = new SignatureRefusal(SignatureRefusal::MISSING_KEY, 'B386992484B357EFE18FCA25DA8D8D3D7BFE43D3', '/home/rod/.gnupg');
+        $refusal = new SignatureRefusal(SignatureRefusal::MISSING_KEY, 'B386992484B357EFE18FCA25DA8D8D3D7BFE43D3', '/home/operator/.gnupg');
 
         self::assertSame(
-            'the key that signed it (B386992484B357EFE18FCA25DA8D8D3D7BFE43D3) is not in the keyring this terminal reads (/home/rod/.gnupg)',
+            'the key that signed it (B386992484B357EFE18FCA25DA8D8D3D7BFE43D3) is not in the keyring this terminal reads (/home/operator/.gnupg)',
             $refusal->sentence(),
         );
         self::assertSame(

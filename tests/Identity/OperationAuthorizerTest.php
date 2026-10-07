@@ -78,7 +78,7 @@ final class OperationAuthorizerTest extends TestCase
     private function payload(
         string $operation = 'plugins.remove',
         array $arguments = ['name' => 'MailPlugin'],
-        string $host = 'cm4070',
+        string $host = 'workstation',
         ?string $issuedAt = null,
     ): string {
         return (new OperationAuthorization(
@@ -97,7 +97,7 @@ final class OperationAuthorizerTest extends TestCase
 
     private function signer(): VerifiedSigner
     {
-        return new VerifiedSigner('BE7554E982E2CA5A0213B6067D72DEBDA1D36D34', 'Rodrigo Vicente <rodrigo@teamx.agency>');
+        return new VerifiedSigner('AAAA1111BBBB2222CCCC3333DDDD4444EEEE5555', 'Rodrigo Vicente <rodrigo@teamx.agency>');
     }
 
     public function test_a_signature_over_this_exact_call_authorizes_it(): void
@@ -105,14 +105,14 @@ final class OperationAuthorizerTest extends TestCase
         $verdict = $this->authorizer($this->signer())->authorize(
             'plugins.remove',
             ['name' => 'MailPlugin'],
-            'cm4070',
+            'workstation',
             $this->payload(),
             'signature',
             self::NOW,
         );
 
         self::assertTrue($verdict->granted);
-        self::assertSame('BE7554E982E2CA5A0213B6067D72DEBDA1D36D34', $verdict->signer?->fingerprint);
+        self::assertSame('AAAA1111BBBB2222CCCC3333DDDD4444EEEE5555', $verdict->signer?->fingerprint);
     }
 
     public function test_no_signer_means_no_authorization(): void
@@ -122,7 +122,7 @@ final class OperationAuthorizerTest extends TestCase
         $verdict = $this->authorizer(null)->authorize(
             'plugins.remove',
             ['name' => 'MailPlugin'],
-            'cm4070',
+            'workstation',
             $this->payload(),
             'signature',
             self::NOW,
@@ -139,7 +139,7 @@ final class OperationAuthorizerTest extends TestCase
         $verdict = $this->authorizer($this->signer())->authorize(
             'plugins.remove',
             ['name' => 'BillingPlugin'],
-            'cm4070',
+            'workstation',
             $this->payload(arguments: ['name' => 'MailPlugin']),
             'signature',
             self::NOW,
@@ -154,7 +154,7 @@ final class OperationAuthorizerTest extends TestCase
         $verdict = $this->authorizer($this->signer())->authorize(
             'plugins.remove',
             ['name' => 'MailPlugin'],
-            'cm4070',
+            'workstation',
             $this->payload(operation: 'plugins.disable'),
             'signature',
             self::NOW,
@@ -171,13 +171,13 @@ final class OperationAuthorizerTest extends TestCase
             'plugins.remove',
             ['name' => 'MailPlugin'],
             'milpa-prod-1',
-            $this->payload(host: 'cm4070'),
+            $this->payload(host: 'workstation'),
             'signature',
             self::NOW,
         );
 
         self::assertFalse($verdict->granted);
-        self::assertStringContainsString('cm4070', (string) $verdict->reason);
+        self::assertStringContainsString('workstation', (string) $verdict->reason);
     }
 
     public function test_an_expired_authorization_is_refused_with_what_to_do_about_it(): void
@@ -185,7 +185,7 @@ final class OperationAuthorizerTest extends TestCase
         $verdict = $this->authorizer($this->signer())->authorize(
             'plugins.remove',
             ['name' => 'MailPlugin'],
-            'cm4070',
+            'workstation',
             $this->payload(),
             'signature',
             self::NOW + 300,
@@ -200,7 +200,7 @@ final class OperationAuthorizerTest extends TestCase
         $verdict = $this->authorizer($this->signer())->authorize(
             'plugins.remove',
             ['name' => 'MailPlugin'],
-            'cm4070',
+            'workstation',
             $this->payload(),
             'signature',
             self::NOW + 119,
@@ -215,7 +215,7 @@ final class OperationAuthorizerTest extends TestCase
         $verdict = $this->authorizer($this->signer())->authorize(
             'plugins.remove',
             ['name' => 'MailPlugin'],
-            'cm4070',
+            'workstation',
             $this->payload(),
             'signature',
             self::NOW - 60,
@@ -230,7 +230,7 @@ final class OperationAuthorizerTest extends TestCase
         $verdict = $this->authorizer($this->signer(), $this->ledger(accepts: false))->authorize(
             'plugins.remove',
             ['name' => 'MailPlugin'],
-            'cm4070',
+            'workstation',
             $this->payload(),
             'signature',
             self::NOW,
@@ -249,7 +249,7 @@ final class OperationAuthorizerTest extends TestCase
         $this->authorizer($this->signer(), $ledger)->authorize(
             'plugins.remove',
             ['name' => 'BillingPlugin'],
-            'cm4070',
+            'workstation',
             $this->payload(arguments: ['name' => 'MailPlugin']),
             'signature',
             self::NOW,
@@ -263,7 +263,7 @@ final class OperationAuthorizerTest extends TestCase
         $verdict = $this->authorizer($this->signer())->authorize(
             'plugins.remove',
             ['name' => 'MailPlugin'],
-            'cm4070',
+            'workstation',
             '{"hello":"world"}',
             'signature',
             self::NOW,
@@ -280,7 +280,7 @@ final class OperationAuthorizerTest extends TestCase
         $verdict = $this->authorizer($this->signer())->authorize(
             'plugins.remove',
             ['b' => 2, 'a' => 1],
-            'cm4070',
+            'workstation',
             $this->payload(arguments: ['a' => 1, 'b' => 2]),
             'signature',
             self::NOW,
@@ -297,7 +297,7 @@ final class OperationAuthorizerTest extends TestCase
         $verdict = $this->authorizer($this->signer())->authorize(
             'schema.apply',
             ['steps' => ['create', 'drop']],
-            'cm4070',
+            'workstation',
             $this->payload(operation: 'schema.apply', arguments: ['steps' => ['drop', 'create']]),
             'signature',
             self::NOW,
@@ -311,7 +311,7 @@ final class OperationAuthorizerTest extends TestCase
         $verdict = $this->authorizer($this->signer())->authorize(
             'schema.apply',
             ['target' => ['table' => 'users', 'column' => 'email']],
-            'cm4070',
+            'workstation',
             $this->payload(operation: 'schema.apply', arguments: ['target' => ['column' => 'email', 'table' => 'users']]),
             'signature',
             self::NOW,
@@ -352,7 +352,7 @@ final class OperationAuthorizerTest extends TestCase
     {
         // The uid is whatever the keyholder typed when creating the key; the fingerprint is derived
         // from the key material. Only one of them is safe to key a record on.
-        self::assertStringStartsWith('BE7554E9', $this->signer()->principal());
+        self::assertStringStartsWith('AAAA1111', $this->signer()->principal());
         self::assertStringContainsString('rodrigo@teamx.agency', $this->signer()->principal());
     }
 }

@@ -52,7 +52,7 @@ final class SignedMutationPolicyTest extends TestCase
     private function signedContext(): ToolContext
     {
         return ToolContext::authorizedBy(
-            new VerifiedSigner('BE7554E982E2CA5A0213B6067D72DEBDA1D36D34', 'Rodrigo Vicente <rodrigo@teamx.agency>'),
+            new VerifiedSigner('AAAA1111BBBB2222CCCC3333DDDD4444EEEE5555', 'Rodrigo Vicente <rodrigo@teamx.agency>'),
             [],
         );
     }
@@ -106,7 +106,7 @@ final class SignedMutationPolicyTest extends TestCase
         // signature verified, so that is what the gate looks at — a context whose principal merely
         // says it is a key gets refused like any other unsigned call.
         $impersonating = new ToolContext(
-            principal: 'BE7554E982E2CA5A0213B6067D72DEBDA1D36D34 (Rodrigo Vicente)',
+            principal: 'AAAA1111BBBB2222CCCC3333DDDD4444EEEE5555 (Rodrigo Vicente)',
             channel: 'cli',
             scopes: ['*'],
         );
