@@ -39,7 +39,7 @@ final class GrantedAuthorizationTest extends TestCase
             issuedAt: '2026-08-18T12:00:00+00:00',
             nonce: 'deadbeefdeadbeef',
         );
-        $signer = new VerifiedSigner('BE7554E982E2CA5A0213B6067D72DEBDA1D36D34', 'Rodrigo Vicente <rodrigo@teamx.agency>');
+        $signer = new VerifiedSigner('AAAA1111BBBB2222CCCC3333DDDD4444EEEE5555', 'Rodrigo Vicente <rodrigo@teamx.agency>');
         $payload = $authorization->canonical();
         $signature = '-----BEGIN PGP SIGNATURE----- the armored block as gpg emitted it';
 
@@ -48,7 +48,7 @@ final class GrantedAuthorizationTest extends TestCase
         self::assertSame($authorization, $granted->authorization);
         self::assertSame($signer, $granted->signer);
         self::assertSame('session.own', $granted->authorization->operation);
-        self::assertSame('BE7554E982E2CA5A0213B6067D72DEBDA1D36D34', $granted->signer->fingerprint);
+        self::assertSame('AAAA1111BBBB2222CCCC3333DDDD4444EEEE5555', $granted->signer->fingerprint);
     }
 
     public function test_payload_and_signature_are_the_exact_bytes_given_and_not_a_paraphrase(): void
@@ -62,7 +62,7 @@ final class GrantedAuthorizationTest extends TestCase
 
         $granted = new GrantedAuthorization(
             authorization: new OperationAuthorization('session.own', [], 'host', '2026-08-18T12:00:00+00:00', 'nonce-1'),
-            signer: new VerifiedSigner('BE7554E982E2CA5A0213B6067D72DEBDA1D36D34'),
+            signer: new VerifiedSigner('AAAA1111BBBB2222CCCC3333DDDD4444EEEE5555'),
             payload: $payload,
             signature: $signature,
         );

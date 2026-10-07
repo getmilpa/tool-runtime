@@ -42,14 +42,14 @@ final class SignedContextTest extends TestCase
 
     public function test_a_signed_call_is_attributed_to_the_key_that_signed_it(): void
     {
-        $signer = new VerifiedSigner('BE7554E982E2CA5A0213B6067D72DEBDA1D36D34', 'Rodrigo Vicente <rodrigo@teamx.agency>');
+        $signer = new VerifiedSigner('AAAA1111BBBB2222CCCC3333DDDD4444EEEE5555', 'Rodrigo Vicente <rodrigo@teamx.agency>');
 
         $context = ToolContext::authorizedBy($signer, ['plugins:write']);
 
         // Fingerprint first: an auditor months later can re-verify against it, which is the whole
         // difference between a record and a claim.
-        self::assertStringStartsWith('BE7554E982E2CA5A0213B6067D72DEBDA1D36D34', (string) $context->principal);
-        self::assertSame('BE7554E982E2CA5A0213B6067D72DEBDA1D36D34', $context->extra['signer.fingerprint']);
+        self::assertStringStartsWith('AAAA1111BBBB2222CCCC3333DDDD4444EEEE5555', (string) $context->principal);
+        self::assertSame('AAAA1111BBBB2222CCCC3333DDDD4444EEEE5555', $context->extra['signer.fingerprint']);
     }
 
     public function test_a_signature_grants_the_operation_it_named_and_not_everything(): void
@@ -58,7 +58,7 @@ final class SignedContextTest extends TestCase
         // operation, so the grant is exactly that operation's requirements — anything wider would
         // be reading consent for one act as consent for the surface.
         $context = ToolContext::authorizedBy(
-            new VerifiedSigner('BE7554E982E2CA5A0213B6067D72DEBDA1D36D34'),
+            new VerifiedSigner('AAAA1111BBBB2222CCCC3333DDDD4444EEEE5555'),
             ['plugins:write'],
         );
 
@@ -71,16 +71,16 @@ final class SignedContextTest extends TestCase
     {
         // A uid is what the keyholder typed; the fingerprint is derived from the key. Missing the
         // first changes how the line reads, never whether it identifies.
-        $context = ToolContext::authorizedBy(new VerifiedSigner('BE7554E982E2CA5A0213B6067D72DEBDA1D36D34'), []);
+        $context = ToolContext::authorizedBy(new VerifiedSigner('AAAA1111BBBB2222CCCC3333DDDD4444EEEE5555'), []);
 
-        self::assertSame('BE7554E982E2CA5A0213B6067D72DEBDA1D36D34', $context->principal);
+        self::assertSame('AAAA1111BBBB2222CCCC3333DDDD4444EEEE5555', $context->principal);
         self::assertNull($context->extra['signer.uid']);
     }
 
     public function test_plan_mode_survives_the_signature(): void
     {
         $context = ToolContext::authorizedBy(
-            new VerifiedSigner('BE7554E982E2CA5A0213B6067D72DEBDA1D36D34'),
+            new VerifiedSigner('AAAA1111BBBB2222CCCC3333DDDD4444EEEE5555'),
             ['plugins:write'],
             mode: 'plan',
         );
