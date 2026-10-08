@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.19.1](https://github.com/getmilpa/tool-runtime/compare/v0.19.0...v0.19.1) (2026-10-08)
+
+
+### Bug Fixes
+
+* what Composer installs carries no tests, nor a machine's name or key with them ([#53](https://github.com/getmilpa/tool-runtime/issues/53)) ([1820c7d](https://github.com/getmilpa/tool-runtime/commit/1820c7da0bb3fcfa6cbf4a1c93a2ff99d00c10bd))
+
 ## [0.19.0](https://github.com/getmilpa/tool-runtime/compare/v0.18.0...v0.19.0) (2026-09-30)
 
 
