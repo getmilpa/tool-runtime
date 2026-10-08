@@ -142,15 +142,15 @@ final class GnupgSignatureVerifierTest extends TestCase
     {
         $gpg = $this->gpgPrinting(
             "[GNUPG:] NEWSIG\n"
-            . "[GNUPG:] ERRSIG DA8D8D3D7BFE43D3 22 10 00 1790745392 9 B386992484B357EFE18FCA25DA8D8D3D7BFE43D3\n"
-            . "[GNUPG:] NO_PUBKEY DA8D8D3D7BFE43D3\n"
+            . "[GNUPG:] ERRSIG ABCD1234ABCD1234 22 10 00 1790745392 9 ABCD1234ABCD1234ABCD1234ABCD1234ABCD1234\n"
+            . "[GNUPG:] NO_PUBKEY ABCD1234ABCD1234\n"
             . '[GNUPG:] FAILURE gpg-exit 33554433'
         );
 
         $refusal = (new GnupgSignatureVerifier($gpg))->whyNot('payload', 'signature');
 
         self::assertSame(SignatureRefusal::MISSING_KEY, $refusal?->reason);
-        self::assertSame('B386992484B357EFE18FCA25DA8D8D3D7BFE43D3', $refusal?->key);
+        self::assertSame('ABCD1234ABCD1234ABCD1234ABCD1234ABCD1234', $refusal?->key);
         self::assertStringContainsString('is not in the keyring this terminal reads', $refusal?->sentence() ?? '');
         self::assertStringNotContainsString('altered', $refusal?->sentence() ?? '');
         self::assertStringContainsString('GNUPGHOME', $refusal?->remedy() ?? '');
@@ -168,7 +168,7 @@ final class GnupgSignatureVerifierTest extends TestCase
 
     public function test_a_bad_signature_is_named_altered(): void
     {
-        $gpg = $this->gpgPrinting("[GNUPG:] BADSIG DA8D8D3D7BFE43D3 resident\n[GNUPG:] FAILURE gpg-exit 33554433");
+        $gpg = $this->gpgPrinting("[GNUPG:] BADSIG ABCD1234ABCD1234 resident\n[GNUPG:] FAILURE gpg-exit 33554433");
 
         $refusal = (new GnupgSignatureVerifier($gpg))->whyNot('payload', 'signature');
 
@@ -179,9 +179,9 @@ final class GnupgSignatureVerifierTest extends TestCase
 
     public function test_an_expired_or_revoked_key_is_named_as_such(): void
     {
-        $expired = $this->gpgPrinting('[GNUPG:] EXPKEYSIG DA8D8D3D7BFE43D3 resident');
-        $revoked = $this->gpgPrinting('[GNUPG:] REVKEYSIG DA8D8D3D7BFE43D3 resident');
-        $old = $this->gpgPrinting('[GNUPG:] EXPSIG DA8D8D3D7BFE43D3 resident');
+        $expired = $this->gpgPrinting('[GNUPG:] EXPKEYSIG ABCD1234ABCD1234 resident');
+        $revoked = $this->gpgPrinting('[GNUPG:] REVKEYSIG ABCD1234ABCD1234 resident');
+        $old = $this->gpgPrinting('[GNUPG:] EXPSIG ABCD1234ABCD1234 resident');
 
         self::assertSame(SignatureRefusal::KEY_EXPIRED, (new GnupgSignatureVerifier($expired))->whyNot('p', 's')?->reason);
         self::assertSame(SignatureRefusal::KEY_REVOKED, (new GnupgSignatureVerifier($revoked))->whyNot('p', 's')?->reason);
@@ -212,17 +212,17 @@ final class GnupgSignatureVerifierTest extends TestCase
     {
         // The port's rule stands (SignatureVerifier): verify() says null for every refusal. whyNot() only
         // puts words to it; a missing key must not become a softer «no» a caller could proceed on.
-        $gpg = $this->gpgPrinting("[GNUPG:] ERRSIG DA8D8D3D7BFE43D3 22 10 00 1790745392 9 B386992484B357EFE18FCA25DA8D8D3D7BFE43D3\n[GNUPG:] NO_PUBKEY DA8D8D3D7BFE43D3");
+        $gpg = $this->gpgPrinting("[GNUPG:] ERRSIG ABCD1234ABCD1234 22 10 00 1790745392 9 ABCD1234ABCD1234ABCD1234ABCD1234ABCD1234\n[GNUPG:] NO_PUBKEY ABCD1234ABCD1234");
 
         self::assertNull((new GnupgSignatureVerifier($gpg))->verify('payload', 'signature'));
     }
 
     public function test_the_missing_key_sentence_names_the_keyring_it_read(): void
     {
-        $refusal = new SignatureRefusal(SignatureRefusal::MISSING_KEY, 'B386992484B357EFE18FCA25DA8D8D3D7BFE43D3', '/home/operator/.gnupg');
+        $refusal = new SignatureRefusal(SignatureRefusal::MISSING_KEY, 'ABCD1234ABCD1234ABCD1234ABCD1234ABCD1234', '/home/operator/.gnupg');
 
         self::assertSame(
-            'the key that signed it (B386992484B357EFE18FCA25DA8D8D3D7BFE43D3) is not in the keyring this terminal reads (/home/operator/.gnupg)',
+            'the key that signed it (ABCD1234ABCD1234ABCD1234ABCD1234ABCD1234) is not in the keyring this terminal reads (/home/operator/.gnupg)',
             $refusal->sentence(),
         );
         self::assertSame(
