@@ -362,7 +362,7 @@ class ToolAuditLoggerTest extends TestCase
             principal: 'user:123',
             channel: 'web',
             scopes: ['read'],
-            ip: '192.168.1.100'
+            ip: '192.0.2.100'
         );
 
         $this->logger->expects($this->once())
